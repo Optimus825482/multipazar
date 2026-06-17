@@ -9,7 +9,9 @@ export const metadata: Metadata = {
   title: "Multi-Pazar Analiz Pro | Gumroad + Udemy + Capafy AI",
   description: "3 dijital pazaryerini karsilastirmali analiz edin. Gumroad dijital urunler, Udemy online kurslar, Capafy AI skill pazaryeri. Trendler, firsatlar ve capraz pazar stratejileri.",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   },
 }
 

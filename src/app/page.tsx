@@ -689,8 +689,8 @@ export default function Home() {
         <div className="max-w-[1400px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-orange-500 via-violet-500 to-cyan-500 flex items-center justify-center shadow-lg">
-                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center">
+                <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-base sm:text-xl font-bold tracking-tight bg-gradient-to-r from-orange-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent">

@@ -1,0 +1,20 @@
+services:
+  mulpaz:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mulpaz-app
+    restart: unless-stopped
+    ports:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      - DATABASE_URL=file:/app/db/custom.db
+      - NEXT_PUBLIC_BASE_URL=https://market.erkanerdem.online
+    volumes:
+      - mulpaz-db:/app/db
+
+volumes:
+  mulpaz-db:

@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+!worklog.md
+.env
+.env.local
+.env.production
+scripts/
+upload/
+tool-results/
+download/
+.zscripts/
+*.zip
+*.tar.gz
