@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  icon        String?
+  color       String?
+  avgPrice    Float
+  totalProducts   Int
+  totalRevenue    Float
+  searchVolume    Int
+  demandScore     Float
+  supplyScore     Float
+  competitionIndex Float
+  growthRate      Float
+  trendDirection  String   // "up", "down", "stable"
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  products   Product[]
+}
+
+model Product {
+  id              String    @id @default(cuid())
+  name            String
+  categoryId      String
+  category        Category  @relation(fields: [categoryId], references: [id])
+  price           Float
+  salesCount      Int
+  revenue         Float
+  rating          Float
+  reviewCount     Int
+  searchVolume    Int
+  demandScore     Float
+  supplyScore     Float
+  opportunityScore Float
+  tags            String    // comma separated
+  createdAt       String
+  updatedAt       String
+  description     String?
+  seller          String?
+  type            String    // "template", "course", "ebook", "software", "design", "audio", "other"
+  avgMonthlySales Int
+  priceRange      String    // "budget", "mid", "premium"
+  isTrending      Boolean   @default(false)
+}
+
+model MarketInsight {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  insightType String   // "opportunity", "trend", "warning", "tip"
+  categoryId  String?
+  impactScore Float
+  createdAt   DateTime @default(now())
+}
+
+model SearchTrend {
+  id          String   @id @default(cuid())
+  keyword     String
+  categorySlug String?
+  month       String   // "2024-01", "2024-02", etc.
+  volume      Int
+  createdAt   DateTime @default(now())
+}
