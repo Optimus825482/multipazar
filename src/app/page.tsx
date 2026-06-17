@@ -254,9 +254,10 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
   const productLabel = config.productLabel
 
   return (
-    <Tabs value={innerTab} onValueChange={setInnerTab} className="space-y-6">
+    <Tabs value={innerTab} onValueChange={setInnerTab} className="space-y-4 sm:space-y-6">
       <TabsList className="bg-white/50 border shadow-sm h-auto p-1 flex-wrap gap-1">
-        {[
+        {
+          [
           { value: 'dashboard', label: 'Dashboard', icon: BarChart3 },
           { value: 'categories', label: 'Kategoriler', icon: Layers },
           { value: 'products', label: productLabel + 'ler', icon: Package },
@@ -265,17 +266,17 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
           { value: 'insights', label: 'Pazar Zekasi', icon: Lightbulb },
         ].map((tab) => (
           <TabsTrigger key={tab.value} value={tab.value}
-            className={`gap-1.5 px-3 sm:px-4 text-xs sm:text-sm transition-all ${innerTab === tab.value ? 'text-white shadow-sm rounded-md' : 'hover:bg-muted/50'}`}
+            className={`gap-1 px-2 sm:px-3 text-[10px] sm:text-xs transition-all ${innerTab === tab.value ? 'text-white shadow-sm rounded-md' : 'hover:bg-muted/50'}`}
             style={innerTab === tab.value ? { backgroundColor: config.color } : undefined}>
-            <tab.icon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{tab.label}</span>
+            <tab.icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <span className="hidden xs:inline sm:inline">{tab.label}</span>
           </TabsTrigger>
         ))}
       </TabsList>
 
       {/* DASHBOARD */}
-      <TabsContent value="dashboard" className="space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <TabsContent value="dashboard" className="space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
           {[
             { label: 'Toplam Gelir', value: formatNumber(data.overview?.totalRevenue || 0), icon: DollarSign, color: config.gradient, change: '+18%', up: true },
             { label: `Toplam ${productLabel}`, value: formatCount(getOverviewCount(data.overview)), icon: Package, color: 'from-violet-500 to-purple-500', change: '+12%', up: true },
@@ -283,34 +284,34 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
             { label: 'Ort. Buyume', value: `${(data.overview?.avgGrowthRate || 0).toFixed(1)}%`, icon: TrendingUp, color: 'from-emerald-500 to-green-500', change: '+5%', up: true },
             { label: 'Kategori', value: data.overview?.totalCategories || 0, icon: Layers, color: 'from-pink-500 to-rose-500', change: `${categories.length} adet`, up: true },
           ].map((card, i) => (
-            <Card key={`overview-${i}`} className="border-0 shadow-lg shadow-black/5 overflow-hidden">
-              <CardContent className="p-4 sm:p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center shadow-md`}>
-                    <card.icon className="w-5 h-5 text-white" />
+            <Card key={`overview-${i}`} className="border-0 shadow-md shadow-black/5 overflow-hidden">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-start justify-between mb-2 sm:mb-3">
+                  <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center shadow-md`}>
+                    <card.icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
-                  <div className={`flex items-center gap-0.5 text-xs font-medium ${card.up ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <div className={`hidden sm:flex items-center gap-0.5 text-xs font-medium ${card.up ? 'text-emerald-600' : 'text-red-600'}`}>
                     {card.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                     {card.change}
                   </div>
                 </div>
-                <div className="text-2xl font-bold tracking-tight">{card.value}</div>
+                <div className="text-lg sm:text-2xl font-bold tracking-tight">{card.value}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">{card.label}</div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border-0 shadow-lg shadow-black/5">
-            <CardHeader className="pb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <Card className="border-0 shadow-md shadow-black/5">
+            <CardHeader className="pb-1.5 sm:pb-2">
               <div className="flex items-center justify-between">
-                <div><CardTitle className="text-base font-semibold">Kategori Bazli Gelir</CardTitle><CardDescription className="text-xs">Toplam gelir dagilimi</CardDescription></div>
-                <PieIcon className="w-4 h-4 text-muted-foreground" />
+                <div><CardTitle className="text-sm sm:text-base font-semibold">Kategori Bazli Gelir</CardTitle><CardDescription className="text-[10px] sm:text-xs">Toplam gelir dagilimi</CardDescription></div>
+                <PieIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[320px]">
+              <div className="h-[220px] sm:h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={categoryRevenueData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -326,15 +327,15 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg shadow-black/5">
-            <CardHeader className="pb-2">
+          <Card className="border-0 shadow-md shadow-black/5">
+            <CardHeader className="pb-1.5 sm:pb-2">
               <div className="flex items-center justify-between">
-                <div><CardTitle className="text-base font-semibold">Talep vs Arz</CardTitle><CardDescription className="text-xs">Kategori skorlari</CardDescription></div>
-                <Target className="w-4 h-4 text-muted-foreground" />
+                <div><CardTitle className="text-sm sm:text-base font-semibold">Talep vs Arz</CardTitle><CardDescription className="text-[10px] sm:text-xs">Kategori skorlari</CardDescription></div>
+                <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[320px]">
+              <div className="h-[220px] sm:h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={demandSupplyData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -351,12 +352,12 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
         </div>
 
         {/* Trending + Lowest Competition */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border-0 shadow-lg shadow-black/5">
-            <CardHeader className="pb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <Card className="border-0 shadow-md shadow-black/5">
+            <CardHeader className="pb-1.5 sm:pb-2">
               <div className="flex items-center justify-between">
-                <div><CardTitle className="text-base font-semibold">Trend {productLabel}ler</CardTitle><CardDescription className="text-xs">En yuksek firsat skoru</CardDescription></div>
-                <Flame className="w-4 h-4 text-red-500" />
+                <div><CardTitle className="text-sm sm:text-base font-semibold">Trend {productLabel}ler</CardTitle><CardDescription className="text-[10px] sm:text-xs">En yuksek firsat skoru</CardDescription></div>
+                <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
               </div>
             </CardHeader>
             <CardContent>
@@ -382,26 +383,26 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg shadow-black/5">
-            <CardHeader className="pb-2">
+          <Card className="border-0 shadow-md shadow-black/5">
+            <CardHeader className="pb-1.5 sm:pb-2">
               <div className="flex items-center justify-between">
-                <div><CardTitle className="text-base font-semibold">En Dusuk Rekabetli Kategoriler</CardTitle><CardDescription className="text-xs">Yeni girenler icin uygun</CardDescription></div>
-                <Shield className="w-4 h-4 text-emerald-500" />
+                <div><CardTitle className="text-sm sm:text-base font-semibold">En Dusuk Rekabetli Kategoriler</CardTitle><CardDescription className="text-[10px] sm:text-xs">Yeni girenler icin uygun</CardDescription></div>
+                <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[280px]">
-                <div className="space-y-2.5">
+              <ScrollArea className="h-[220px] sm:h-[280px]">
+                <div className="space-y-2">
                   {data.lowestCompetition?.map((c: Category, i: number) => (
-                    <div key={c.slug || `lc-${i}`} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: c.color + '20' }}>
-                        <span className="text-xs font-bold" style={{ color: c.color }}>#{i + 1}</span>
+                    <div key={c.slug || `lc-${i}`} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: c.color + '20' }}>
+                        <span className="text-[10px] sm:text-xs font-bold" style={{ color: c.color }}>#{i + 1}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">{c.name}</div>
-                        <div className="text-xs text-muted-foreground">{getProductCount(c).toLocaleString()} {productLabel.toLowerCase()}</div>
+                        <div className="font-medium text-xs sm:text-sm truncate">{c.name}</div>
+                        <div className="text-[10px] sm:text-xs text-muted-foreground">{getProductCount(c).toLocaleString()} {productLabel.toLowerCase()}</div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         <ScoreBadge score={safeNum(c.competitionIndex)} label="RI" />
                         <div className={`text-xs font-medium flex items-center gap-0.5 ${safeNum(c.growthRate) > 20 ? 'text-emerald-600' : 'text-amber-600'}`}>
                           <TrendingUp className="w-3 h-3" />{safeNum(c.growthRate)}%
@@ -417,31 +418,31 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
       </TabsContent>
 
       {/* CATEGORIES */}
-      <TabsContent value="categories" className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <TabsContent value="categories" className="space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {categories.map((cat) => (
-            <Card key={cat.slug} className="border-0 shadow-lg shadow-black/5 overflow-hidden hover:shadow-xl transition-all duration-300 group">
-              <div className="h-1.5" style={{ backgroundColor: cat.color }} />
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div><CardTitle className="text-base font-semibold group-hover:text-orange-600 transition-colors">{cat.name}</CardTitle><CardDescription className="text-xs mt-1">{cat.description}</CardDescription></div>
+            <Card key={cat.slug} className="border-0 shadow-md shadow-black/5 overflow-hidden hover:shadow-lg transition-all duration-300 group">
+              <div className="h-1" style={{ backgroundColor: cat.color }} />
+              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
+                <div className="flex items-start justify-between gap-2">
+                  <div><CardTitle className="text-sm sm:text-base font-semibold group-hover:text-orange-600 transition-colors">{cat.name}</CardTitle><CardDescription className="text-[10px] sm:text-xs mt-0.5 sm:mt-1 line-clamp-2">{cat.description}</CardDescription></div>
                   <Badge variant="outline" className={`text-[10px] ${cat.trendDirection === 'up' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : cat.trendDirection === 'down' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
                     {cat.trendDirection === 'up' ? <ArrowUpRight className="w-2.5 h-2.5" /> : cat.trendDirection === 'down' ? <ArrowDownRight className="w-2.5 h-2.5" /> : null}
                     {cat.trendDirection === 'up' ? 'Yukseliyor' : cat.trendDirection === 'down' ? ' Dusuyor' : 'Stabil'}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{formatNumber(safeNum(cat.totalRevenue))}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam Gelir</div></div>
-                  <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{getProductCount(cat).toLocaleString()}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam {productLabel}</div></div>
+              <CardContent className="pt-0 space-y-3 px-3 sm:px-6">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 rounded-lg bg-muted/50"><div className="text-sm sm:text-lg font-bold" style={{ color: cat.color }}>{formatNumber(safeNum(cat.totalRevenue))}</div><div className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wider">Toplam Gelir</div></div>
+                  <div className="p-2 rounded-lg bg-muted/50"><div className="text-sm sm:text-lg font-bold" style={{ color: cat.color }}>{getProductCount(cat).toLocaleString()}</div><div className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wider">Toplam {productLabel}</div></div>
                 </div>
                 <div className="space-y-2.5">
                   <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Talep Skoru</span><span className="font-mono font-semibold text-emerald-600">{safeNum(cat.demandScore)}</span></div><Progress value={safeNum(cat.demandScore) * 10} className="h-1.5" /></div>
                   <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Arz Skoru</span><span className="font-mono font-semibold text-red-500">{safeNum(cat.supplyScore)}</span></div><Progress value={safeNum(cat.supplyScore) * 10} className="h-1.5" /></div>
                   <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Buyume</span><span className="font-mono font-semibold" style={{ color: cat.color }}>{safeNum(cat.growthRate)}%</span></div><Progress value={Math.min(safeNum(cat.growthRate) * 1.5, 100)} className="h-1.5" /></div>
                 </div>
-                <div className="flex items-center justify-between pt-2 border-t text-xs">
+                <div className="flex flex-wrap items-center justify-between pt-2 border-t text-[10px] sm:text-xs gap-1">
                   <div className="flex items-center gap-1 text-muted-foreground"><Search className="w-3 h-3" /><span>{formatCount(safeNum(cat.searchVolume))}/ay</span></div>
                   <div className="flex items-center gap-1 text-muted-foreground"><Star className="w-3 h-3" /><span>${safeNum(cat.avgPrice)}</span></div>
                   <div className="flex items-center gap-1 text-muted-foreground"><Users className="w-3 h-3" /><span>RI: {safeNum(cat.competitionIndex)}</span></div>
@@ -453,10 +454,10 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
       </TabsContent>
 
       {/* PRODUCTS */}
-      <TabsContent value="products" className="space-y-6">
-        <Card className="border-0 shadow-lg shadow-black/5">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+      <TabsContent value="products" className="space-y-4 sm:space-y-6">
+        <Card className="border-0 shadow-md shadow-black/5">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                 <SelectTrigger className="w-full sm:w-[250px]"><SelectValue placeholder="Kategori Sec" /></SelectTrigger>
                 <SelectContent>
@@ -476,19 +477,19 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
             </div>
           </CardContent>
         </Card>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           {products.slice(0, 20).map((product, i) => (
-            <Card key={product.name || `prod-${i}`} className="border-0 shadow-lg shadow-black/5 overflow-hidden hover:shadow-xl transition-all duration-300 group">
-              <div className="h-1" style={{ backgroundColor: product.category?.color || config.color }} />
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: (product.category?.color || config.color) + '15' }}>
-                    <span className="text-lg font-bold" style={{ color: product.category?.color || config.color }}>{i + 1}</span>
+            <Card key={product.name || `prod-${i}`} className="border-0 shadow-md shadow-black/5 overflow-hidden hover:shadow-lg transition-all duration-300 group">
+              <div className="h-0.5" style={{ backgroundColor: product.category?.color || config.color }} />
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: (product.category?.color || config.color) + '15' }}>
+                    <span className="text-sm sm:text-lg font-bold" style={{ color: product.category?.color || config.color }}>{i + 1}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-sm group-hover:text-orange-600 transition-colors truncate">{product.name}</h3>
-                      {product.isTrending && <Badge variant="secondary" className="text-[10px] bg-red-50 text-red-600 border-red-200 gap-0.5"><Flame className="w-2.5 h-2.5" />Trend</Badge>}
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <h3 className="font-semibold text-xs sm:text-sm group-hover:text-orange-600 transition-colors truncate">{product.name}</h3>
+                      {product.isTrending && <Badge variant="secondary" className="text-[9px] sm:text-[10px] bg-red-50 text-red-600 border-red-200 gap-0.5"><Flame className="w-2 h-2 sm:w-2.5 sm:h-2.5" />Trend</Badge>}
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <Badge variant="outline" className="text-[10px]" style={{ borderColor: product.category?.color, color: product.category?.color }}>{product.category?.name}</Badge>
@@ -496,13 +497,13 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                  <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold text-orange-600">${product.price}</div><div className="text-[10px] text-muted-foreground">Fiyat</div></div>
-                  <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold">{formatCount(product.salesCount || product.studentCount || 0)}</div><div className="text-[10px] text-muted-foreground">{salesLabel}</div></div>
-                  <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold">{product.rating}</div><div className="text-[10px] text-muted-foreground">Puan ({product.reviewCount})</div></div>
-                  <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold text-emerald-600">{formatNumber(product.revenue)}</div><div className="text-[10px] text-muted-foreground">Gelir</div></div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-muted/50 text-center"><div className="text-xs sm:text-sm font-bold text-orange-600">${product.price}</div><div className="text-[9px] sm:text-[10px] text-muted-foreground">Fiyat</div></div>
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-muted/50 text-center"><div className="text-xs sm:text-sm font-bold">{formatCount(product.salesCount || product.studentCount || 0)}</div><div className="text-[9px] sm:text-[10px] text-muted-foreground">{salesLabel}</div></div>
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-muted/50 text-center"><div className="text-xs sm:text-sm font-bold">{product.rating}</div><div className="text-[9px] sm:text-[10px] text-muted-foreground">Puan ({product.reviewCount})</div></div>
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-muted/50 text-center"><div className="text-xs sm:text-sm font-bold text-emerald-600">{formatNumber(product.revenue)}</div><div className="text-[9px] sm:text-[10px] text-muted-foreground">Gelir</div></div>
                 </div>
-                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 mt-2 sm:mt-3 flex-wrap">
                   <ScoreBadge score={safeNum(product.demandScore)} label="Talep" />
                   <ScoreBadge score={safeNum(product.supplyScore)} label="Arz" />
                   <ScoreBadge score={safeNum(product.opportunityScore)} label="Firsat" />
@@ -514,58 +515,58 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
       </TabsContent>
 
       {/* OPPORTUNITIES */}
-      <TabsContent value="opportunities" className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="border-0 shadow-lg shadow-black/5 bg-gradient-to-br from-emerald-50 to-teal-50">
-            <CardContent className="p-5 text-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3"><Zap className="w-6 h-6 text-emerald-600" /></div>
-              <div className="text-3xl font-bold text-emerald-700">{data.opportunities?.summary?.totalOpportunities || 0}</div>
-              <div className="text-sm text-emerald-600 mt-1">Toplam Firsat</div>
+      <TabsContent value="opportunities" className="space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <Card className="border-0 shadow-md shadow-black/5 bg-gradient-to-br from-emerald-50 to-teal-50">
+            <CardContent className="p-3 sm:p-5 text-center">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-2 sm:mb-3"><Zap className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" /></div>
+              <div className="text-2xl sm:text-3xl font-bold text-emerald-700">{data.opportunities?.summary?.totalOpportunities || 0}</div>
+              <div className="text-xs sm:text-sm text-emerald-600 mt-1">Toplam Firsat</div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-lg shadow-black/5 bg-gradient-to-br from-orange-50 to-amber-50">
-            <CardContent className="p-5 text-center">
-              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-3"><Target className="w-6 h-6 text-orange-600" /></div>
-              <div className="text-3xl font-bold text-orange-700">{data.opportunities?.summary?.avgGapScore?.toFixed(1) || 0}</div>
-              <div className="text-sm text-orange-600 mt-1">Ort. Gap Skoru</div>
+          <Card className="border-0 shadow-md shadow-black/5 bg-gradient-to-br from-orange-50 to-amber-50">
+            <CardContent className="p-3 sm:p-5 text-center">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-2 sm:mb-3"><Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" /></div>
+              <div className="text-2xl sm:text-3xl font-bold text-orange-700">{data.opportunities?.summary?.avgGapScore?.toFixed(1) || 0}</div>
+              <div className="text-xs sm:text-sm text-orange-600 mt-1">Ort. Gap Skoru</div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-lg shadow-black/5 bg-gradient-to-br from-violet-50 to-purple-50">
-            <CardContent className="p-5 text-center">
-              <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mx-auto mb-3"><Sparkles className="w-6 h-6 text-violet-600" /></div>
-              <div className="text-3xl font-bold text-violet-700">{data.opportunities?.productIdeas?.length || 0}</div>
-              <div className="text-sm text-violet-600 mt-1">{productLabel} Fikri</div>
+          <Card className="border-0 shadow-md shadow-black/5 bg-gradient-to-br from-violet-50 to-purple-50">
+            <CardContent className="p-3 sm:p-5 text-center">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-violet-100 flex items-center justify-center mx-auto mb-2 sm:mb-3"><Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-violet-600" /></div>
+              <div className="text-2xl sm:text-3xl font-bold text-violet-700">{data.opportunities?.productIdeas?.length || 0}</div>
+              <div className="text-xs sm:text-sm text-violet-600 mt-1">{productLabel} Fikri</div>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="border-0 shadow-lg shadow-black/5">
-          <CardHeader className="pb-2">
+        <Card className="border-0 shadow-md shadow-black/5">
+          <CardHeader className="pb-1.5 sm:pb-2">
             <div className="flex items-center justify-between">
-              <div><CardTitle className="text-base font-semibold">Hizli Olusturulabilir {productLabel} Onerileri</CardTitle><CardDescription className="text-xs">Yuksek talep, dusuk arz</CardDescription></div>
-              <Sparkles className="w-4 h-4 text-violet-500" />
+              <div><CardTitle className="text-sm sm:text-base font-semibold">Hizli Olusturulabilir {productLabel} Onerileri</CardTitle><CardDescription className="text-[10px] sm:text-xs">Yuksek talep, dusuk arz</CardDescription></div>
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               {data.opportunities?.productIdeas?.map((idea: ProductIdea, i: number) => (
-                <div key={idea.name || `idea-${i}`} className="relative p-4 rounded-xl border-2 border-dashed hover:border-solid transition-all duration-300 group" style={{ borderColor: i < 3 ? '#10b981' : '#e5e7eb' }}>
-                  {i < 3 && <Badge className="absolute -top-2.5 left-4 bg-emerald-500 text-white text-[10px] gap-0.5"><Zap className="w-2.5 h-2.5" />Oncelikli</Badge>}
-                  <h3 className="font-semibold text-sm mt-1 group-hover:text-orange-600 transition-colors">{idea.name}</h3>
-                  <Badge variant="outline" className="text-[10px] mt-1">{idea.category}</Badge>
-                  <div className="grid grid-cols-3 gap-2 mt-3">
-                    <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold text-orange-600">${idea.estimatedPrice}</div><div className="text-[10px] text-muted-foreground">Fiyat</div></div>
-                    <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold">{(idea.estimatedMonthlySales || idea.estimatedMonthlyEnroll || 0).toLocaleString()}/ay</div><div className="text-[10px] text-muted-foreground">Aylik</div></div>
-                    <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold text-emerald-600">{formatNumber(idea.estimatedMonthlyRevenue)}/ay</div><div className="text-[10px] text-muted-foreground">Gelir</div></div>
+                <div key={idea.name || `idea-${i}`} className="relative p-3 sm:p-4 rounded-xl border-2 border-dashed hover:border-solid transition-all duration-300 group" style={{ borderColor: i < 3 ? '#10b981' : '#e5e7eb' }}>
+                  {i < 3 && <Badge className="absolute -top-2.5 left-4 bg-emerald-500 text-white text-[9px] sm:text-[10px] gap-0.5"><Zap className="w-2 h-2 sm:w-2.5 sm:h-2.5" />Oncelikli</Badge>}
+                  <h3 className="font-semibold text-xs sm:text-sm mt-1 group-hover:text-orange-600 transition-colors">{idea.name}</h3>
+                  <Badge variant="outline" className="text-[9px] sm:text-[10px] mt-1">{idea.category}</Badge>
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2 sm:mt-3">
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-muted/50 text-center"><div className="text-xs sm:text-sm font-bold text-orange-600">${idea.estimatedPrice}</div><div className="text-[9px] sm:text-[10px] text-muted-foreground">Fiyat</div></div>
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-muted/50 text-center"><div className="text-xs sm:text-sm font-bold">{(idea.estimatedMonthlySales || idea.estimatedMonthlyEnroll || 0).toLocaleString()}/ay</div><div className="text-[9px] sm:text-[10px] text-muted-foreground">Aylik</div></div>
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-muted/50 text-center"><div className="text-xs sm:text-sm font-bold text-emerald-600">{formatNumber(idea.estimatedMonthlyRevenue)}/ay</div><div className="text-[9px] sm:text-[10px] text-muted-foreground">Gelir</div></div>
                   </div>
-                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  <div className="flex items-center gap-1.5 sm:gap-2 mt-2 sm:mt-3 flex-wrap">
                     <ScoreBadge score={safeNum(idea.demandScore)} label="Talep" /><ScoreBadge score={safeNum(idea.supplyScore)} label="Arz" /><ScoreBadge score={safeNum(idea.gapScore)} label="Gap" />
                   </div>
-                  <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1"><Timer className="w-3 h-3" />{idea.timeToCreate}</div>
-                    <div className="flex items-center gap-1"><Layers className="w-3 h-3" />Zorluk: {idea.difficulty}</div>
+                  <div className="flex items-center gap-2 sm:gap-3 mt-2 sm:mt-3 text-[10px] sm:text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1"><Timer className="w-2.5 h-2.5 sm:w-3 sm:h-3" />{idea.timeToCreate}</div>
+                    <div className="flex items-center gap-1"><Layers className="w-2.5 h-2.5 sm:w-3 sm:h-3" />Zorluk: {idea.difficulty}</div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-3 leading-relaxed bg-muted/30 p-2.5 rounded-lg">{idea.reason}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 sm:mt-3 leading-relaxed bg-muted/30 p-2 sm:p-2.5 rounded-lg">{idea.reason}</p>
                 </div>
               ))}
             </div>
@@ -574,17 +575,17 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
       </TabsContent>
 
       {/* TRENDS */}
-      <TabsContent value="trends" className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <TabsContent value="trends" className="space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {(data.trends || []).slice(0, 6).map((trend) => (
-            <Card key={trend.keyword} className="border-0 shadow-lg shadow-black/5 overflow-hidden">
-              <div className={`h-1 ${trend.growthRate > 30 ? 'bg-emerald-500' : trend.growthRate > 10 ? 'bg-orange-500' : 'bg-amber-500'}`} />
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-semibold text-sm">{trend.keyword}</h3>
-                  <Badge variant="secondary" className={`text-[10px] ${trend.growthRate > 30 ? 'bg-emerald-50 text-emerald-600' : trend.growthRate > 10 ? 'bg-orange-50 text-orange-600' : 'bg-amber-50 text-amber-600'}`}>+{trend.growthRate}%</Badge>
+            <Card key={trend.keyword} className="border-0 shadow-md shadow-black/5 overflow-hidden">
+              <div className={`h-0.5 ${trend.growthRate > 30 ? 'bg-emerald-500' : trend.growthRate > 10 ? 'bg-orange-500' : 'bg-amber-500'}`} />
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-start justify-between mb-2 sm:mb-3">
+                  <h3 className="font-semibold text-xs sm:text-sm">{trend.keyword}</h3>
+                  <Badge variant="secondary" className={`text-[9px] sm:text-[10px] ${trend.growthRate > 30 ? 'bg-emerald-50 text-emerald-600' : trend.growthRate > 10 ? 'bg-orange-50 text-orange-600' : 'bg-amber-50 text-amber-600'}`}>+{trend.growthRate}%</Badge>
                 </div>
-                <div className="h-[120px]">
+                <div className="h-[100px] sm:h-[120px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={trend.data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                       <defs><linearGradient id={`grad-${platform}-${trend.keyword}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={trend.growthRate > 30 ? '#10b981' : '#f97316'} stopOpacity={0.3} /><stop offset="95%" stopColor={trend.growthRate > 30 ? '#10b981' : '#f97316'} stopOpacity={0} /></linearGradient></defs>
@@ -602,19 +603,19 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
       </TabsContent>
 
       {/* INSIGHTS */}
-      <TabsContent value="insights" className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <TabsContent value="insights" className="space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           {(data.insights || []).map((insight, i) => (
-            <Card key={insight.title || `insight-${i}`} className="border-0 shadow-lg shadow-black/5 overflow-hidden hover:shadow-xl transition-all duration-300">
-              <div className={`h-1.5 ${insight.insightType === 'opportunity' ? 'bg-emerald-500' : insight.insightType === 'warning' ? 'bg-red-500' : 'bg-orange-500'}`} />
-              <CardContent className="p-5">
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${insight.insightType === 'opportunity' ? 'bg-emerald-100' : insight.insightType === 'warning' ? 'bg-red-100' : 'bg-orange-100'}`}>
-                    {insight.insightType === 'opportunity' ? <Zap className="w-5 h-5 text-emerald-600" /> : insight.insightType === 'warning' ? <AlertTriangle className="w-5 h-5 text-red-600" /> : <TrendingUp className="w-5 h-5 text-orange-600" />}
+            <Card key={insight.title || `insight-${i}`} className="border-0 shadow-md shadow-black/5 overflow-hidden hover:shadow-lg transition-all duration-300">
+              <div className={`h-1 ${insight.insightType === 'opportunity' ? 'bg-emerald-500' : insight.insightType === 'warning' ? 'bg-red-500' : 'bg-orange-500'}`} />
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${insight.insightType === 'opportunity' ? 'bg-emerald-100' : insight.insightType === 'warning' ? 'bg-red-100' : 'bg-orange-100'}`}>
+                    {insight.insightType === 'opportunity' ? <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" /> : insight.insightType === 'warning' ? <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" /> : <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />}
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-sm">{insight.title}</h3>
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                      <h3 className="font-semibold text-xs sm:text-sm">{insight.title}</h3>
                       <Badge variant="outline" className={`text-[10px] ${insight.insightType === 'opportunity' ? 'text-emerald-600 border-emerald-200' : insight.insightType === 'warning' ? 'text-red-600 border-red-200' : 'text-orange-600 border-orange-200'}`}>
                         {insight.insightType === 'opportunity' ? 'Firsat' : insight.insightType === 'warning' ? 'Uyari' : 'Trend'}
                       </Badge>
@@ -682,28 +683,28 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-orange-50">
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50 shrink-0">
+        <div className="max-w-[1400px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 via-violet-500 to-cyan-500 flex items-center justify-center shadow-lg">
-                <BarChart3 className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-orange-500 via-violet-500 to-cyan-500 flex items-center justify-center shadow-lg">
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-orange-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent">
+                <h1 className="text-base sm:text-xl font-bold tracking-tight bg-gradient-to-r from-orange-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent">
                   Multi-Pazar Analiz Pro
                 </h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">Gumroad + Udemy + Capafy AI | 3 Pazaryeri Karsilastirmali Analiz</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Gumroad + Udemy + Capafy AI | 3 Pazaryeri Karsilastirmali Analiz</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Badge variant="secondary" className="hidden sm:flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-200">
                 <Activity className="w-3 h-3" />Canli Veriler
               </Badge>
-              <Badge variant="secondary" className="hidden sm:flex items-center gap-1.5">
-                <Globe className="w-3 h-3" />3 Pazaryeri
+              <Badge variant="secondary" className="flex sm:flex items-center gap-1 text-[10px] sm:text-xs">
+                <Globe className="w-3 h-3" />3 Pazar
               </Badge>
             </div>
           </div>
@@ -711,10 +712,10 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Platform Selector */}
         <Tabs value={activePlatform} onValueChange={(v) => setActivePlatform(v as any)} className="space-y-6">
-          <TabsList className="bg-white border shadow-sm h-auto p-1.5 flex-wrap gap-1">
+          <TabsList className="bg-white border shadow-sm h-auto p-1 sm:p-1.5 flex-wrap gap-1">
             {[
               { value: 'gumroad', label: 'Gumroad', sublabel: 'Dijital Urun', icon: ShoppingCart, color: 'bg-orange-500' },
               { value: 'udemy', label: 'Udemy', sublabel: 'Online Kurs', icon: GraduationCap, color: 'bg-violet-500' },
@@ -722,15 +723,15 @@ export default function Home() {
               { value: 'compare', label: 'Karsilastirma', sublabel: '3 Platform', icon: GitCompare, color: 'bg-gradient-to-r from-orange-500 via-violet-500 to-cyan-500' },
             ].map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}
-                className={`gap-2 px-4 sm:px-6 py-2.5 text-xs sm:text-sm rounded-lg transition-all ${activePlatform === tab.value ? 'text-white shadow-md' : 'hover:bg-muted/50'}`}
+                className={`gap-1.5 sm:gap-2 px-2.5 sm:px-5 py-2 sm:py-2.5 text-[11px] sm:text-sm rounded-lg transition-all ${activePlatform === tab.value ? 'text-white shadow-md' : 'hover:bg-muted/50'}`}
                 style={activePlatform === tab.value ? {
                   backgroundColor: tab.value === 'compare' ? undefined : tab.value === 'gumroad' ? '#f97316' : tab.value === 'udemy' ? '#8b5cf6' : '#06b6d4',
                   backgroundImage: tab.value === 'compare' ? 'linear-gradient(to right, #f97316, #8b5cf6, #06b6d4)' : undefined,
                 } : undefined}>
-                <tab.icon className="w-4 h-4" />
+                <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <div className="text-left">
-                  <div className="font-semibold text-xs sm:text-sm">{tab.label}</div>
-                  <div className="text-[10px] opacity-70">{tab.sublabel}</div>
+                  <div className="font-semibold text-[11px] sm:text-sm leading-tight">{tab.label}</div>
+                  <div className="text-[9px] sm:text-[10px] opacity-70 leading-tight">{tab.sublabel}</div>
                 </div>
               </TabsTrigger>
             ))}
@@ -747,19 +748,19 @@ export default function Home() {
 
           {/* COMPARE TAB */}
           {activePlatform === 'compare' && compareData && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Platform Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6">
                 {compareData.platforms.map((p: any, i: number) => (
-                  <Card key={`platform-${i}`} className="border-0 shadow-lg shadow-black/5 overflow-hidden">
-                    <div className="h-2" style={{ backgroundColor: p.color }} />
-                    <CardContent className="p-5">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: p.color + '15' }}>
-                          <PlatformIcon platform={p.name.toLowerCase().replace(' ai', '')} className="w-6 h-6" style={{ color: p.color } as any} />
+                  <Card key={`platform-${i}`} className="border-0 shadow-md shadow-black/5 overflow-hidden">
+                    <div className="h-1.5" style={{ backgroundColor: p.color }} />
+                    <CardContent className="p-3 sm:p-5">
+                      <div className="flex items-center gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${p.color}15` }}>
+                          <PlatformIcon platform={p.name.toLowerCase().replace(/ ai/g, "")} className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: p.color } as any} />
                         </div>
                         <div>
-                          <h3 className="font-bold text-lg">{p.name}</h3>
+                          <h3 className="font-bold text-sm sm:text-lg">{p.name}</h3>
                           <p className="text-xs text-muted-foreground">{p.type}</p>
                         </div>
                       </div>
@@ -774,9 +775,9 @@ export default function Home() {
                       )}
                       <div className="mt-4 pt-3 border-t">
                         <div className="text-xs font-semibold mb-2" style={{ color: p.color }}>En Hizli Buyume</div>
-                        {p.topGrowthCategory && <div className="text-sm">{p.topGrowthCategory.name} <span className="text-emerald-600">+{p.topGrowthCategory.growthRate}%</span></div>}
-                        <div className="text-xs font-semibold mt-3 mb-2" style={{ color: p.color }}>En Dusuk Rekabet</div>
-                        {p.lowestCompetition && <div className="text-sm">{p.lowestCompetition.name} <span className="text-emerald-600">RI: {p.lowestCompetition.competitionIndex}</span></div>}
+                        {p.topGrowthCategory && <div className="text-xs sm:text-sm">{p.topGrowthCategory.name} <span className="text-emerald-600">+{p.topGrowthCategory.growthRate}%</span></div>}
+                        <div className="text-[10px] sm:text-xs font-semibold mt-2 sm:mt-3 mb-1 sm:mb-2" style={{ color: p.color }}>En Dusuk Rekabet</div>
+                        {p.lowestCompetition && <div className="text-xs sm:text-sm">{p.lowestCompetition.name} <span className="text-emerald-600">RI: {p.lowestCompetition.competitionIndex}</span></div>}
                       </div>
                     </CardContent>
                   </Card>
@@ -784,15 +785,15 @@ export default function Home() {
               </div>
 
               {/* Comparison Radar Chart */}
-              <Card className="border-0 shadow-lg shadow-black/5">
-                <CardHeader className="pb-2">
+              <Card className="border-0 shadow-md shadow-black/5">
+                <CardHeader className="pb-1.5 sm:pb-2">
                   <div className="flex items-center justify-between">
-                    <div><CardTitle className="text-base font-semibold">Platform Karsilastirma Radari</CardTitle><CardDescription className="text-xs">Buyume, talep, rekabet, fiyat ve komisyon karsilastirmasi</CardDescription></div>
-                    <GitCompare className="w-4 h-4 text-violet-500" />
+                    <div><CardTitle className="text-sm sm:text-base font-semibold">Platform Karsilastirma Radari</CardTitle><CardDescription className="text-[10px] sm:text-xs">Buyume, talep, rekabet, fiyat ve komisyon karsilastirmasi</CardDescription></div>
+                    <GitCompare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[400px]">
+                  <div className="h-[280px] sm:h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart cx="50%" cy="50%" outerRadius="70%" data={compareData.comparisonMetrics.map(m => ({
                         metric: m.metric,
@@ -815,27 +816,27 @@ export default function Home() {
               </Card>
 
               {/* Cross-Market Opportunities */}
-              <Card className="border-0 shadow-lg shadow-black/5">
-                <CardHeader className="pb-2">
+              <Card className="border-0 shadow-md shadow-black/5">
+                <CardHeader className="pb-1.5 sm:pb-2">
                   <div className="flex items-center justify-between">
-                    <div><CardTitle className="text-base font-semibold">Capraz Pazar Firsatlari</CardTitle><CardDescription className="text-xs">3 platformda da guclu talep goren konular ve strateji onerileri</CardDescription></div>
-                    <Trophy className="w-4 h-4 text-amber-500" />
+                    <div><CardTitle className="text-sm sm:text-base font-semibold">Capraz Pazar Firsatlari</CardTitle><CardDescription className="text-[10px] sm:text-xs">3 platformda da guclu talep goren konular</CardDescription></div>
+                    <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="max-h-[600px]">
-                    <div className="space-y-4">
+                  <ScrollArea className="max-h-[500px] sm:max-h-[600px]">
+                    <div className="space-y-3 sm:space-y-4">
                       {compareData.crossMarketOpportunities.map((opp: any, i: number) => (
-                        <div key={`cross-${i}`} className="p-4 rounded-xl border hover:shadow-md transition-all">
-                          <div className="flex items-center justify-between mb-3">
+                        <div key={`cross-${i}`} className="p-3 sm:p-4 rounded-xl border hover:shadow-md transition-all">
+                          <div className="flex items-center justify-between mb-2 sm:mb-3 gap-2">
                             <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-violet-500 flex items-center justify-center text-white font-bold text-sm">{i + 1}</div>
-                              <h3 className="font-semibold text-sm">{opp.theme}</h3>
+                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-orange-500 to-violet-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">{i + 1}</div>
+                              <h3 className="font-semibold text-xs sm:text-sm">{opp.theme}</h3>
                             </div>
-                            <Badge variant="secondary" className="text-xs bg-emerald-50 text-emerald-700">{opp.bestPlatform}</Badge>
+                            <Badge variant="secondary" className="text-[10px] sm:text-xs bg-emerald-50 text-emerald-700 whitespace-nowrap">{opp.bestPlatform}</Badge>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
                             {/* Gumroad */}
                             <div className="p-2.5 rounded-lg border-l-4" style={{ borderColor: '#f97316' }}>
                               <div className="flex items-center gap-1 mb-1"><ShoppingCart className="w-3 h-3 text-orange-500" /><span className="text-[10px] font-semibold text-orange-600">Gumroad</span></div>
@@ -877,12 +878,12 @@ export default function Home() {
               </Card>
 
               {/* Platform Strengths */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6">
                 {compareData.platformStrengths.map((ps: any, i: number) => (
-                  <Card key={`strength-${i}`} className="border-0 shadow-lg shadow-black/5">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base font-semibold">{ps.platform}</CardTitle>
-                      <CardDescription className="text-xs">Guclu Yonler ve Zayifliklar</CardDescription>
+                  <Card key={`strength-${i}`} className="border-0 shadow-md shadow-black/5">
+                    <CardHeader className="pb-1.5 sm:pb-2">
+                      <CardTitle className="text-sm sm:text-base font-semibold">{ps.platform}</CardTitle>
+                      <CardDescription className="text-[10px] sm:text-xs">Guclu Yonler ve Zayifliklar</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
@@ -916,20 +917,20 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t mt-12 bg-white/50">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="border-t mt-8 sm:mt-12 bg-white/80 backdrop-blur-sm shrink-0">
+        <div className="max-w-[1400px] mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-6">
+          <div className="flex flex-col items-center gap-3 sm:gap-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <BarChart3 className="w-4 h-4 text-orange-500" />
-              <span>Multi-Pazar Analiz Pro</span>
+              <span className="font-medium">Multi-Pazar Analiz Pro</span>
             </div>
-            <div className="text-xs text-muted-foreground text-center">
+            <div className="text-[11px] sm:text-xs text-muted-foreground text-center">
               Gumroad + Udemy + Capafy AI | Gercek Pazar Verileri | Karsilastirmali Analiz
             </div>
-            <div className="flex items-center gap-3 text-xs">
-              <Badge variant="outline" className="text-orange-600 border-orange-200"><ShoppingCart className="w-3 h-3 mr-1" />Gumroad</Badge>
-              <Badge variant="outline" className="text-violet-600 border-violet-200"><GraduationCap className="w-3 h-3 mr-1" />Udemy</Badge>
-              <Badge variant="outline" className="text-cyan-600 border-cyan-200"><Bot className="w-3 h-3 mr-1" />Capafy AI</Badge>
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+              <Badge variant="outline" className="text-orange-600 border-orange-200 text-[10px] sm:text-xs"><ShoppingCart className="w-3 h-3 mr-1" />Gumroad</Badge>
+              <Badge variant="outline" className="text-violet-600 border-violet-200 text-[10px] sm:text-xs"><GraduationCap className="w-3 h-3 mr-1" />Udemy</Badge>
+              <Badge variant="outline" className="text-cyan-600 border-cyan-200 text-[10px] sm:text-xs"><Bot className="w-3 h-3 mr-1" />Capafy AI</Badge>
             </div>
           </div>
         </div>
