@@ -171,6 +171,10 @@ const PLATFORM_CONFIG = {
   capafy: { name: 'Capafy AI', color: '#06b6d4', gradient: 'from-cyan-500 to-teal-500', label: 'AI Skill', productLabel: 'Skill', salesLabel: 'Satis', api: '/api/capafy' },
 }
 
+function safeNum(n: any, fallback: number = 0): number {
+  return typeof n === 'number' && isFinite(n) ? n : fallback
+}
+
 // Shared sub-tabs for each marketplace
 function MarketplaceContent({ data, platform }: { data: PlatformData | null; platform: 'gumroad' | 'udemy' | 'capafy' }) {
   const config = PLATFORM_CONFIG[platform]
@@ -359,7 +363,7 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
                         <div className="text-xs text-muted-foreground">{p.category?.name || p.tags?.split(',')[0]}</div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <ScoreBadge score={p.opportunityScore} />
+                        <ScoreBadge score={safeNum(p.opportunityScore)} />
                         <Badge variant="outline" className="text-xs">${p.price}</Badge>
                       </div>
                     </div>
@@ -386,12 +390,12 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{c.name}</div>
-                        <div className="text-xs text-muted-foreground">{c.totalProducts.toLocaleString()} {productLabel.toLowerCase()}</div>
+                        <div className="text-xs text-muted-foreground">{(c.totalProducts || 0).toLocaleString()} {productLabel.toLowerCase()}</div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <ScoreBadge score={c.competitionIndex} label="RI" />
-                        <div className={`text-xs font-medium flex items-center gap-0.5 ${c.growthRate > 20 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          <TrendingUp className="w-3 h-3" />{c.growthRate}%
+                        <ScoreBadge score={safeNum(c.competitionIndex)} label="RI" />
+                        <div className={`text-xs font-medium flex items-center gap-0.5 ${safeNum(c.growthRate) > 20 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          <TrendingUp className="w-3 h-3" />{safeNum(c.growthRate)}%
                         </div>
                       </div>
                     </div>
@@ -420,18 +424,18 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
               </CardHeader>
               <CardContent className="pt-0 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{formatNumber(cat.totalRevenue)}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam Gelir</div></div>
-                  <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{cat.totalProducts.toLocaleString()}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam {productLabel}</div></div>
+                  <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{formatNumber(safeNum(cat.totalRevenue))}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam Gelir</div></div>
+                  <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{(safeNum(cat.totalProducts)).toLocaleString()}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam {productLabel}</div></div>
                 </div>
                 <div className="space-y-2.5">
-                  <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Talep Skoru</span><span className="font-mono font-semibold text-emerald-600">{cat.demandScore}</span></div><Progress value={cat.demandScore * 10} className="h-1.5" /></div>
-                  <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Arz Skoru</span><span className="font-mono font-semibold text-red-500">{cat.supplyScore}</span></div><Progress value={cat.supplyScore * 10} className="h-1.5" /></div>
-                  <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Buyume</span><span className="font-mono font-semibold" style={{ color: cat.color }}>{cat.growthRate}%</span></div><Progress value={Math.min(cat.growthRate * 1.5, 100)} className="h-1.5" /></div>
+                  <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Talep Skoru</span><span className="font-mono font-semibold text-emerald-600">{safeNum(cat.demandScore)}</span></div><Progress value={safeNum(cat.demandScore) * 10} className="h-1.5" /></div>
+                  <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Arz Skoru</span><span className="font-mono font-semibold text-red-500">{safeNum(cat.supplyScore)}</span></div><Progress value={safeNum(cat.supplyScore) * 10} className="h-1.5" /></div>
+                  <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Buyume</span><span className="font-mono font-semibold" style={{ color: cat.color }}>{safeNum(cat.growthRate)}%</span></div><Progress value={Math.min(safeNum(cat.growthRate) * 1.5, 100)} className="h-1.5" /></div>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t text-xs">
-                  <div className="flex items-center gap-1 text-muted-foreground"><Search className="w-3 h-3" /><span>{formatCount(cat.searchVolume)}/ay</span></div>
-                  <div className="flex items-center gap-1 text-muted-foreground"><Star className="w-3 h-3" /><span>${cat.avgPrice}</span></div>
-                  <div className="flex items-center gap-1 text-muted-foreground"><Users className="w-3 h-3" /><span>RI: {cat.competitionIndex}</span></div>
+                  <div className="flex items-center gap-1 text-muted-foreground"><Search className="w-3 h-3" /><span>{formatCount(safeNum(cat.searchVolume))}/ay</span></div>
+                  <div className="flex items-center gap-1 text-muted-foreground"><Star className="w-3 h-3" /><span>${safeNum(cat.avgPrice)}</span></div>
+                  <div className="flex items-center gap-1 text-muted-foreground"><Users className="w-3 h-3" /><span>RI: {safeNum(cat.competitionIndex)}</span></div>
                 </div>
               </CardContent>
             </Card>
@@ -490,9 +494,9 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
                   <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold text-emerald-600">{formatNumber(product.revenue)}</div><div className="text-[10px] text-muted-foreground">Gelir</div></div>
                 </div>
                 <div className="flex items-center gap-2 mt-3 flex-wrap">
-                  <ScoreBadge score={product.demandScore} label="Talep" />
-                  <ScoreBadge score={product.supplyScore} label="Arz" />
-                  <ScoreBadge score={product.opportunityScore} label="Firsat" />
+                  <ScoreBadge score={safeNum(product.demandScore)} label="Talep" />
+                  <ScoreBadge score={safeNum(product.supplyScore)} label="Arz" />
+                  <ScoreBadge score={safeNum(product.opportunityScore)} label="Firsat" />
                 </div>
               </CardContent>
             </Card>
@@ -546,7 +550,7 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
                     <div className="p-2 rounded-lg bg-muted/50 text-center"><div className="text-sm font-bold text-emerald-600">{formatNumber(idea.estimatedMonthlyRevenue)}/ay</div><div className="text-[10px] text-muted-foreground">Gelir</div></div>
                   </div>
                   <div className="flex items-center gap-2 mt-3 flex-wrap">
-                    <ScoreBadge score={idea.demandScore} label="Talep" /><ScoreBadge score={idea.supplyScore} label="Arz" /><ScoreBadge score={idea.gapScore} label="Gap" />
+                    <ScoreBadge score={safeNum(idea.demandScore)} label="Talep" /><ScoreBadge score={safeNum(idea.supplyScore)} label="Arz" /><ScoreBadge score={safeNum(idea.gapScore)} label="Gap" />
                   </div>
                   <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1"><Timer className="w-3 h-3" />{idea.timeToCreate}</div>
