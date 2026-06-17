@@ -629,7 +629,7 @@ export default function Home() {
                     <SelectContent>
                       <SelectItem value="all">Tum Kategoriler</SelectItem>
                       {categories.map((c) => (
-                        <SelectItem key={c.id} value={c.slug}>{c.name}</SelectItem>
+                        <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
