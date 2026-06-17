@@ -32,7 +32,7 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Runtime'da schemayi senkronla
-RUN cd /app && bunx prisma db push --skip-generate
+RUN cd /app && bunx prisma db push
 
 EXPOSE 3000
 
