@@ -440,7 +440,7 @@ export default function Home() {
                   <ScrollArea className="h-[280px]">
                     <div className="space-y-3">
                       {dashboardData?.topProducts?.slice(0, 8).map((p: Product, i: number) => (
-                        <div key={p.name} className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-transparent to-orange-50/50 hover:from-orange-50/50 transition-colors">
+                        <div key={p.id || `top-${i}`} className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-transparent to-orange-50/50 hover:from-orange-50/50 transition-colors">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${i < 3 ? 'bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md' : 'bg-muted text-muted-foreground'}`}>
                             {i + 1}
                           </div>
@@ -479,7 +479,7 @@ export default function Home() {
                   <ScrollArea className="h-[260px]">
                     <div className="space-y-2.5">
                       {dashboardData?.trendingProducts?.map((p: Product, i: number) => (
-                        <div key={p.name} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
+                        <div key={p.id || `trending-${i}`} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
                           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: p.category?.color + '20' }}>
                             <Sparkles className="w-4 h-4" style={{ color: p.category?.color }} />
                           </div>
@@ -513,7 +513,7 @@ export default function Home() {
                   <ScrollArea className="h-[260px]">
                     <div className="space-y-2.5">
                       {dashboardData?.lowestCompetition?.map((c: Category, i: number) => (
-                        <div key={c.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
+                        <div key={c.id || `lowest-${i}`} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
                           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: c.color + '20' }}>
                             <span className="text-xs font-bold" style={{ color: c.color }}>#{i + 1}</span>
                           </div>
@@ -652,7 +652,7 @@ export default function Home() {
             {/* Product List */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {products.map((product, i) => (
-                <Card key={product.name} className="border-0 shadow-lg shadow-black/5 overflow-hidden hover:shadow-xl transition-all duration-300 group">
+                <Card key={product.id || `product-${i}`} className="border-0 shadow-lg shadow-black/5 overflow-hidden hover:shadow-xl transition-all duration-300 group">
                   <div className="h-1" style={{ backgroundColor: product.category?.color || '#f97316' }} />
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
@@ -808,7 +808,7 @@ export default function Home() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {opportunities?.productIdeas?.map((idea: ProductIdea, i: number) => (
-                    <div key={i} className="relative p-4 rounded-xl border-2 border-dashed hover:border-solid transition-all duration-300 group" style={{ borderColor: i < 3 ? '#10b981' : '#e5e7eb' }}>
+                    <div key={idea.name || `idea-${i}`} className="relative p-4 rounded-xl border-2 border-dashed hover:border-solid transition-all duration-300 group" style={{ borderColor: i < 3 ? '#10b981' : '#e5e7eb' }}>
                       {i < 3 && (
                         <Badge className="absolute -top-2.5 left-4 bg-emerald-500 text-white text-[10px] gap-0.5">
                           <Zap className="w-2.5 h-2.5" />Oncelikli
@@ -862,7 +862,7 @@ export default function Home() {
                 <ScrollArea className="max-h-[400px]">
                   <div className="space-y-3">
                     {opportunities?.categories?.map((cat: any, i: number) => (
-                      <div key={cat.slug} className="p-4 rounded-xl border hover:shadow-md transition-all">
+                      <div key={cat.slug || `opp-cat-${i}`} className="p-4 rounded-xl border hover:shadow-md transition-all">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: cat.color + '20' }}>
