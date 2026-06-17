@@ -54,3 +54,24 @@ Stage Summary:
 - Complete UI rewrite with marketplace switcher
 - Cross-platform comparison with radar chart and detailed analysis
 - All routes verified in build output
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix runtime bugs - totalCourses 0 display + active tab background color
+
+Work Log:
+- Diagnosed field name mismatch: Udemy API returns `totalCourses` in categories and overview, but `MarketplaceContent` component used `totalProducts` uniformly
+- Added `getProductCount(c)` helper to fallback `totalProducts || totalCourses`
+- Added `getOverviewCount(overview)` helper to fallback `overview.totalProducts || overview.totalCourses`
+- Fixed 4 locations in page.tsx: overview stat card, lowest competition list, category cards, category product count
+- Fixed active tab background color: Dynamic Tailwind classes like `data-[state=active]:bg-[${config.color}]` don't work at runtime (JIT can't generate arbitrary hex values)
+- Replaced all dynamic Tailwind class approaches with conditional inline `style` props using `innerTab === tab.value` and `activePlatform === tab.value`
+- Inner sub-tabs and platform selector tabs both fixed with inline backgroundColor
+- Compare tab uses gradient backgroundImage for multi-color effect
+- Build passes successfully, no errors
+
+Stage Summary:
+- "Toplam Kurs 0" bug fixed - Udemy now correctly shows totalCourses count
+- Active tab background color fixed with inline styles (orange for Gumroad, violet for Udemy, cyan for Capafy, gradient for Compare)
+- 2 helper functions added for cross-platform field normalization

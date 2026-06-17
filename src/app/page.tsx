@@ -175,6 +175,14 @@ function safeNum(n: any, fallback: number = 0): number {
   return typeof n === 'number' && isFinite(n) ? n : fallback
 }
 
+function getProductCount(c: any): number {
+  return safeNum(c.totalProducts || c.totalCourses)
+}
+
+function getOverviewCount(overview: any): number {
+  return safeNum(overview?.totalProducts || overview?.totalCourses)
+}
+
 // Shared sub-tabs for each marketplace
 function MarketplaceContent({ data, platform }: { data: PlatformData | null; platform: 'gumroad' | 'udemy' | 'capafy' }) {
   const config = PLATFORM_CONFIG[platform]
@@ -257,7 +265,8 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
           { value: 'insights', label: 'Pazar Zekasi', icon: Lightbulb },
         ].map((tab) => (
           <TabsTrigger key={tab.value} value={tab.value}
-            className={`data-[state=active]:bg-[${config.color}] data-[state=active]:text-white gap-1.5 px-3 sm:px-4 text-xs sm:text-sm`}>
+            className={`gap-1.5 px-3 sm:px-4 text-xs sm:text-sm transition-all ${innerTab === tab.value ? 'text-white shadow-sm rounded-md' : 'hover:bg-muted/50'}`}
+            style={innerTab === tab.value ? { backgroundColor: config.color } : undefined}>
             <tab.icon className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{tab.label}</span>
           </TabsTrigger>
@@ -269,7 +278,7 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[
             { label: 'Toplam Gelir', value: formatNumber(data.overview?.totalRevenue || 0), icon: DollarSign, color: config.gradient, change: '+18%', up: true },
-            { label: `Toplam ${productLabel}`, value: formatCount(data.overview?.totalProducts || 0), icon: Package, color: 'from-violet-500 to-purple-500', change: '+12%', up: true },
+            { label: `Toplam ${productLabel}`, value: formatCount(getOverviewCount(data.overview)), icon: Package, color: 'from-violet-500 to-purple-500', change: '+12%', up: true },
             { label: 'Arama Hacmi', value: formatCount(data.overview?.totalSearchVolume || 0), icon: Search, color: 'from-cyan-500 to-teal-500', change: '+24%', up: true },
             { label: 'Ort. Buyume', value: `${(data.overview?.avgGrowthRate || 0).toFixed(1)}%`, icon: TrendingUp, color: 'from-emerald-500 to-green-500', change: '+5%', up: true },
             { label: 'Kategori', value: data.overview?.totalCategories || 0, icon: Layers, color: 'from-pink-500 to-rose-500', change: `${categories.length} adet`, up: true },
@@ -390,7 +399,7 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{c.name}</div>
-                        <div className="text-xs text-muted-foreground">{(c.totalProducts || 0).toLocaleString()} {productLabel.toLowerCase()}</div>
+                        <div className="text-xs text-muted-foreground">{getProductCount(c).toLocaleString()} {productLabel.toLowerCase()}</div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <ScoreBadge score={safeNum(c.competitionIndex)} label="RI" />
@@ -425,7 +434,7 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
               <CardContent className="pt-0 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{formatNumber(safeNum(cat.totalRevenue))}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam Gelir</div></div>
-                  <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{(safeNum(cat.totalProducts)).toLocaleString()}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam {productLabel}</div></div>
+                  <div className="p-2.5 rounded-lg bg-muted/50"><div className="text-lg font-bold" style={{ color: cat.color }}>{getProductCount(cat).toLocaleString()}</div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">Toplam {productLabel}</div></div>
                 </div>
                 <div className="space-y-2.5">
                   <div><div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Talep Skoru</span><span className="font-mono font-semibold text-emerald-600">{safeNum(cat.demandScore)}</span></div><Progress value={safeNum(cat.demandScore) * 10} className="h-1.5" /></div>
@@ -713,8 +722,11 @@ export default function Home() {
               { value: 'compare', label: 'Karsilastirma', sublabel: '3 Platform', icon: GitCompare, color: 'bg-gradient-to-r from-orange-500 via-violet-500 to-cyan-500' },
             ].map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}
-                className={`${tab.color === 'bg-gradient-to-r from-orange-500 via-violet-500 to-cyan-500' ? '' : 'data-[state=active]:' + tab.color + ' data-[state=active]:text-white'} gap-2 px-4 sm:px-6 py-2.5 text-xs sm:text-sm rounded-lg transition-all`}
-                style={tab.value === 'compare' ? {} : {}}>
+                className={`gap-2 px-4 sm:px-6 py-2.5 text-xs sm:text-sm rounded-lg transition-all ${activePlatform === tab.value ? 'text-white shadow-md' : 'hover:bg-muted/50'}`}
+                style={activePlatform === tab.value ? {
+                  backgroundColor: tab.value === 'compare' ? undefined : tab.value === 'gumroad' ? '#f97316' : tab.value === 'udemy' ? '#8b5cf6' : '#06b6d4',
+                  backgroundImage: tab.value === 'compare' ? 'linear-gradient(to right, #f97316, #8b5cf6, #06b6d4)' : undefined,
+                } : undefined}>
                 <tab.icon className="w-4 h-4" />
                 <div className="text-left">
                   <div className="font-semibold text-xs sm:text-sm">{tab.label}</div>
