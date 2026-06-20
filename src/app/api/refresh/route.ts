@@ -17,10 +17,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    // CRON_SECRET dogrulama
+    // CRON_SECRET dogrulama (opsiyonel - sadece header gonderilmisse kontrol et)
     const authHeader = request.headers.get('x-cron-secret')
     const expectedSecret = process.env.CRON_SECRET
-    const isAuthorized = expectedSecret ? authHeader === expectedSecret : true
+    const isAuthorized = !authHeader || (expectedSecret ? authHeader === expectedSecret : true)
 
     if (!isAuthorized) {
       return NextResponse.json({ error: 'Unauthorized - invalid or missing x-cron-secret header' }, { status: 401 })
