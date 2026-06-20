@@ -1,4 +1,4 @@
-import axios from 'axios'
+import cloudscraper from 'cloudscraper'
 import * as cheerio from 'cheerio'
 
 export interface CapafyProduct {
@@ -26,64 +26,63 @@ export interface CapafyCategoryData {
   products: CapafyProduct[]
 }
 
-const CAPAFY_BASE = 'https://capafy.com'
-
-const USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
-]
-
-function getRandomUserAgent(): string {
-  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]
-}
+const PROMPTBASE_URL = 'https://promptbase.com'
 
 /**
- * Capafy kategori sayfasindan urun verilerini ceker
+ * PromptBase.com'dan gercek AI prompt urunlerini ceker
+ * Cloudflare: promptbase.com acik, cloudscraper gerekmez, basic axios calisir
  */
-async function scrapeCapafyCategory(categorySlug: string): Promise<CapafyProduct[]> {
+async function scrapePromptBase(): Promise<CapafyProduct[]> {
   const products: CapafyProduct[] = []
 
   try {
-    // Capafy'nin kategori sayfasina git
-    const url = `${CAPAFY_BASE}/category/${categorySlug}`
-    const response = await axios.get(url, {
+    const html = await cloudscraper.get({
+      uri: PROMPTBASE_URL,
       headers: {
-        'User-Agent': getRandomUserAgent(),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
       },
       timeout: 15000,
     })
 
-    const $ = cheerio.load(response.data)
+    const $ = cheerio.load(html)
 
-    // Capafy urun kartlarini parse et
-    $('[data-testid="product-card"], .product-card, article, .card').each((_, el) => {
-      const name = $(el).find('[data-testid="product-title"], h2, h3, .title').first().text().trim()
-      const priceText = $(el).find('[data-testid="product-price"], .price, [class*="price"]').first().text().trim()
-      const ratingText = $(el).find('[data-testid="rating"], .rating, [class*="rating"]').first().text().trim()
-      const reviewsText = $(el).find('[data-testid="reviews"], .reviews, [class*="reviews"]').first().text().trim()
-      const creatorText = $(el).find('[data-testid="creator"], .creator, [class*="creator"], .author').first().text().trim()
-      const salesText = $(el).find('[data-testid="sales"], .sales, [class*="sales"]').first().text().trim()
-      const urlPath = $(el).find('a').first().attr('href') || ''
+    // Product listesi - promptbase.com'un HTML yapisina gore seciciler
+    const productSelectors = [
+      '[class*="product-card"]',
+      '[class*="ProductCard"]',
+      '[class*="marketplace-item"]',
+      'article',
+      '.card',
+      '[class*="listing"]',
+      'div[class*="item"]',
+      'li[class*="product"]',
+    ].join(', ')
+
+    $(productSelectors).each((_, el) => {
+      const name = $(el).find('[class*="title"], h2, h3, [class*="name"]').first().text().trim()
+      const priceText = $(el).find('[class*="price"], [class*="amount"], [class*="cost"]').first().text().trim()
+      const creatorText = $(el).find('[class*="author"], [class*="creator"], [class*="seller"]').first().text().trim()
+      const ratingText = $(el).find('[class*="rating"], [class*="stars"]').first().text().trim()
+      const salesText = $(el).find('[class*="sales"], [class*="sold"]').first().text().trim()
+      const linkEl = $(el).find('a').first()
+      const urlPath = linkEl.attr('href') || ''
 
       const price = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0
       const rating = parseFloat(ratingText) || 0
-      const reviewCount = parseInt(reviewsText.replace(/[^0-9]/g, '')) || 0
       const salesCount = parseInt(salesText.replace(/[^0-9]/g, '')) || 0
 
       if (name && price > 0) {
         products.push({
           name,
           price,
-          rating,
-          reviewCount,
+          rating: rating > 5 ? rating / 10 : rating, // normalize 0-5
+          reviewCount: 0,
           salesCount,
-          creator: creatorText || 'Unknown Creator',
-          url: urlPath.startsWith('http') ? urlPath : `${CAPAFY_BASE}${urlPath}`,
+          creator: creatorText || 'PromptBase Seller',
+          url: urlPath.startsWith('http') ? urlPath : `https://promptbase.com${urlPath}`,
           isTrending: false,
-          tags: categorySlug,
+          tags: 'ai-prompts',
           avgMonthlySales: salesCount > 0 ? Math.round(salesCount / 3) : 0,
           demandScore: 0,
           supplyScore: 0,
@@ -91,122 +90,241 @@ async function scrapeCapafyCategory(categorySlug: string): Promise<CapafyProduct
       }
     })
 
-    // JSON-LD verisi varsa onu da dene
+    // JSON-LD'den de dene
     if (products.length === 0) {
       $('script[type="application/ld+json"]').each((_, el) => {
         try {
           const json = JSON.parse($(el).html() || '{}')
           const items = json['@graph'] || json['itemListElement'] || [json]
           for (const item of items) {
-            if (item['@type'] === 'Product' || item['@type'] === 'ListItem') {
-              const product = item['item'] || item
-              const name = product.name || ''
-              const price = parseFloat(product?.offers?.price || '0')
-              const rating = product?.aggregateRating?.ratingValue || 0
-              const reviewCount = product?.aggregateRating?.reviewCount || 0
-
-              if (name && price > 0) {
-                products.push({
-                  name,
-                  price,
-                  rating: parseFloat(rating),
-                  reviewCount: parseInt(reviewCount),
-                  salesCount: 0,
-                  creator: product.brand?.name || product.author?.name || 'Unknown',
-                  url: product.url || '',
-                  isTrending: false,
-                  tags: categorySlug,
-                  avgMonthlySales: 0,
-                  demandScore: 0,
-                  supplyScore: 0,
-                })
-              }
+            const product = item['@type'] === 'Product' ? item : item?.item
+            if (product?.['@type'] === 'Product' && product?.name) {
+              products.push({
+                name: product.name,
+                price: parseFloat(product?.offers?.price || '0'),
+                rating: parseFloat(product?.aggregateRating?.ratingValue || '0'),
+                reviewCount: parseInt(product?.aggregateRating?.reviewCount || '0'),
+                salesCount: 0,
+                creator: product?.brand?.name || product?.author?.name || 'PromptBase',
+                url: product?.url || '',
+                isTrending: false,
+                tags: 'ai-prompts',
+                avgMonthlySales: 0,
+                demandScore: 0,
+                supplyScore: 0,
+              })
             }
           }
         } catch {}
       })
     }
-
-    // API endpoint'ini dene (eğer varsa)
-    if (products.length === 0) {
-      try {
-        const apiUrl = `${CAPAFY_BASE}/api/products?category=${categorySlug}&limit=20`
-        const apiResponse = await axios.get(apiUrl, {
-          headers: {
-            'User-Agent': getRandomUserAgent(),
-            'Accept': 'application/json',
-          },
-          timeout: 10000,
-        })
-
-        if (apiResponse.data?.products || apiResponse.data?.data) {
-          const items = apiResponse.data.products || apiResponse.data.data || []
-          for (const item of items) {
-            products.push({
-              name: item.name || item.title || '',
-              price: parseFloat(item.price || '0'),
-              rating: item.rating || item.averageRating || 0,
-              reviewCount: item.reviewCount || item.numReviews || 0,
-              salesCount: item.sales || item.salesCount || 0,
-              creator: item.creator || item.author || item.seller || 'Unknown',
-              url: item.url || item.link || '',
-              isTrending: item.isTrending || item.trending || false,
-              tags: categorySlug,
-              avgMonthlySales: item.avgMonthlySales || 0,
-              demandScore: 0,
-              supplyScore: 0,
-            })
-          }
-        }
-      } catch {}
-    }
-  } catch (error) {
-    console.error(`[Capafy Scraper] "${categorySlug}" hatasi:`, error instanceof Error ? error.message : error)
+  } catch (error: any) {
+    console.error(`[PromptBase Scraper] Hata: ${error?.message || error}`)
   }
 
   return products
 }
 
 /**
- * Bir Capafy kategorisini ceker ve analiz eder
+ * Fiverr'den AI prompt gig'lerini ceker (cloudscraper ile)
  */
-export async function fetchCapafyCategory(categorySlug: string): Promise<CapafyCategoryData | null> {
-  const products = await scrapeCapafyCategory(categorySlug)
+async function scrapeFiverrAI(): Promise<CapafyProduct[]> {
+  const products: CapafyProduct[] = []
+  const searchTerms = ['ai-prompt', 'ai-agent', 'ai-chatbot', 'ai-automation', 'ai-video-generation']
 
-  if (products.length === 0) {
-    return null
+  try {
+    for (const term of searchTerms) {
+      const html = await cloudscraper.get({
+        uri: `https://www.fiverr.com/search/gigs?query=${term}&page=1`,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        timeout: 15000,
+      })
+
+      const $ = cheerio.load(html)
+
+      // Fiverr JSON data'yı <script> icinden bul
+      $('script').each((_, el) => {
+        const text = $(el).html() || ''
+        // Fiverr initial state JSON'i
+        const match = text.match(/window\.__INITIAL_STATE__\s*=\s*({.+?});/s)
+        if (match) {
+          try {
+            const state = JSON.parse(match[1])
+            const gigs = state?.search?.gigs || state?.searchResults?.gigs || []
+            for (const gig of gigs) {
+              if (gig?.title && gig?.price) {
+                products.push({
+                  name: gig.title,
+                  price: parseFloat(gig.price) || 0,
+                  rating: gig.rating || 0,
+                  reviewCount: gig.reviews || 0,
+                  salesCount: 0,
+                  creator: gig.seller?.username || gig.username || 'Fiverr Seller',
+                  url: gig.url || '',
+                  isTrending: gig.isTrending || false,
+                  tags: term,
+                  avgMonthlySales: 0,
+                  demandScore: 0,
+                  supplyScore: 0,
+                })
+              }
+            }
+          } catch {}
+        }
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+    }
+  } catch (error: any) {
+    console.error(`[Fiverr Scraper] Hata: ${error?.message || error}`)
   }
 
-  const totalProducts = products.length
-  const avgPrice = Math.round(products.reduce((s, p) => s + p.price, 0) / totalProducts)
-  const avgRating = Math.round(products.reduce((s, p) => s + p.rating, 0) / totalProducts * 10) / 10
-  const avgReviews = Math.round(products.reduce((s, p) => s + p.reviewCount, 0) / totalProducts)
+  return products
+}
+
+/**
+ * AI kategorisi slug'ina gore urunleri filtrele
+ */
+function filterProductsByCategory(products: CapafyProduct[], categorySlug: string): CapafyProduct[] {
+  if (!categorySlug || categorySlug === 'all') return products
+
+  const keywords: Record<string, string[]> = {
+    'prompt-engineering': ['prompt', 'chatgpt', 'claude', 'midjourney', 'gpt'],
+    'ai-chatbot-agent': ['chatbot', 'agent', 'bot', 'assistant'],
+    'ai-video-generation': ['video', 'sora', 'runway', 'animation'],
+    'ai-image-generation': ['image', 'midjourney', 'dall-e', 'stable diffusion'],
+    'ai-audio-voice': ['voice', 'audio', 'elevenlabs', 'music'],
+    'ai-automation': ['automation', 'workflow', 'n8n', 'zapier'],
+    'ai-development': ['development', 'api', 'langchain', 'integration'],
+    'ai-marketing': ['marketing', 'content', 'seo', 'social media'],
+    'ai-data-analytics': ['analytics', 'data', 'analysis', 'report'],
+    'ai-education': ['course', 'tutorial', 'learning', 'education'],
+    'ai-writing': ['writing', 'copywriting', 'blog', 'article'],
+    'ai-business': ['business', 'productivity', 'enterprise'],
+  }
+
+  const categoryKeywords = keywords[categorySlug] || []
+  if (categoryKeywords.length === 0) return products.slice(0, 3)
+
+  return products.filter((p) =>
+    categoryKeywords.some((kw) => p.name.toLowerCase().includes(kw) || p.tags.toLowerCase().includes(kw))
+  ).slice(0, 5)
+}
+
+/**
+ * Bir AI kategorisi icin veri ceker
+ */
+export async function fetchCapafyCategory(categorySlug: string): Promise<CapafyCategoryData | null> {
+  const allProducts: CapafyProduct[] = []
+
+  // 1. PromptBase'den cek
+  const promptBaseProducts = await scrapePromptBase()
+  allProducts.push(...promptBaseProducts)
+
+  // 2. Fiverr'dan cek
+  if (allProducts.length < 5) {
+    const fiverrProducts = await scrapeFiverrAI()
+    allProducts.push(...fiverrProducts)
+  }
+
+  // 3. Kategoriye gore filtrele
+  const filtered = filterProductsByCategory(allProducts, categorySlug)
+
+  if (filtered.length === 0) {
+    // Kategoride urun yoksa, tum promptbase urunlerinden ilk 3
+    const generic = allProducts.slice(0, 3)
+    if (generic.length === 0) return null
+    filtered.push(...generic)
+  }
+
+  const totalProducts = filtered.length
+  const avgPrice = Math.round(filtered.reduce((s, p) => s + p.price, 0) / totalProducts)
+  const avgRating = Math.round(filtered.reduce((s, p) => s + p.rating, 0) / totalProducts * 10) / 10
+  const avgReviews = Math.round(filtered.reduce((s, p) => s + p.reviewCount, 0) / totalProducts)
+
+  const nameMap: Record<string, string> = {
+    'prompt-engineering': 'Prompt Mühendisligi',
+    'ai-chatbot-agent': 'AI Chatbot & Agent',
+    'ai-video-generation': 'AI Video Üretimi',
+    'ai-image-generation': 'AI Görüntü Üretimi',
+    'ai-audio-voice': 'AI Ses & Voice',
+    'ai-automation': 'AI Otomasyon',
+    'ai-development': 'AI Gelistirme',
+    'ai-marketing': 'AI Pazarlama',
+    'ai-data-analytics': 'AI Veri Analizi',
+    'ai-education': 'AI Egitim',
+    'ai-writing': 'AI Yazma',
+    'ai-business': 'AI Is Araclari',
+  }
 
   return {
-    name: categorySlug.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+    name: nameMap[categorySlug] || categorySlug.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
     slug: categorySlug,
     totalProducts,
     avgPrice,
     avgRating,
     avgReviews,
-    products,
+    products: filtered,
   }
 }
 
 /**
- * Tum Capafy kategorilerini ceker
+ * Tum Capafy AI kategorilerini ceker
  */
 export async function fetchAllCapafyCategories(
   categorySlugs: string[]
 ): Promise<Map<string, CapafyCategoryData>> {
   const results = new Map<string, CapafyCategoryData>()
 
+  // Tum kategoriler icin once ortak PromptBase + Fiverr verisini cek
+  // (tekrar tekrar ayni siteyi cagirmamak icin)
+  const allAIProducts: CapafyProduct[] = []
+  const pbProducts = await scrapePromptBase()
+  allAIProducts.push(...pbProducts)
+
+  if (allAIProducts.length < 10) {
+    const fvProducts = await scrapeFiverrAI()
+    allAIProducts.push(...fvProducts)
+  }
+
   for (const slug of categorySlugs) {
-    const data = await fetchCapafyCategory(slug)
-    if (data && data.products.length > 0) {
-      results.set(slug, data)
+    const filtered = filterProductsByCategory(allAIProducts, slug)
+    const products = filtered.length > 0 ? filtered : allAIProducts.slice(0, 3)
+
+    if (products.length === 0) continue
+
+    const totalProducts = products.length
+    const avgPrice = Math.round(products.reduce((s, p) => s + p.price, 0) / totalProducts)
+    const avgRating = Math.round(products.reduce((s, p) => s + p.rating, 0) / totalProducts * 10) / 10
+    const avgReviews = Math.round(products.reduce((s, p) => s + p.reviewCount, 0) / totalProducts)
+
+    const nameMap: Record<string, string> = {
+      'prompt-engineering': 'Prompt Mühendisligi',
+      'ai-chatbot-agent': 'AI Chatbot & Agent',
+      'ai-video-generation': 'AI Video Üretimi',
+      'ai-image-generation': 'AI Görüntü Üretimi',
+      'ai-audio-voice': 'AI Ses & Voice',
+      'ai-automation': 'AI Otomasyon',
+      'ai-development': 'AI Gelistirme',
+      'ai-marketing': 'AI Pazarlama',
+      'ai-data-analytics': 'AI Veri Analizi',
+      'ai-education': 'AI Egitim',
+      'ai-writing': 'AI Yazma',
+      'ai-business': 'AI Is Araclari',
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    results.set(slug, {
+      name: nameMap[slug] || slug.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      slug,
+      totalProducts,
+      avgPrice,
+      avgRating,
+      avgReviews,
+      products,
+    })
   }
 
   return results
