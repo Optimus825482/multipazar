@@ -7,6 +7,7 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 COPY package.json bun.lock ./
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN bun install
 
 COPY . .
