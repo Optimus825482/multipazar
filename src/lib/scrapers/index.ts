@@ -115,6 +115,7 @@ async function refreshGumroad() {
   // Kategorileri olustur
   const categorySlugToId: Record<string, string> = {}
   const allCategoryStats: CategoryStats[] = []
+  const categoryGrowthRates: Record<string, number> = {}
 
   for (const cat of categories) {
     const scraped = gumroadData.get(cat.slug)
@@ -126,6 +127,8 @@ async function refreshGumroad() {
     const avgReviews = scraped?.avgReviews || 50
     const searchVolume = trend?.avgVolume || 15000
     const growthRate = trend?.growthRate || 15
+
+    categoryGrowthRates[cat.slug] = growthRate
 
     allCategoryStats.push({
       avgPrice,
@@ -141,6 +144,7 @@ async function refreshGumroad() {
   for (let i = 0; i < categories.length; i++) {
     const cat = categories[i]
     const stats = allCategoryStats[i]
+    const growthRate = categoryGrowthRates[cat.slug] || 15
     const demandScore = calculateDemandScore(stats, allCategoryStats)
     const supplyScore = calculateSupplyScore(stats, allCategoryStats)
 
@@ -232,6 +236,7 @@ async function refreshUdemy() {
   // Kategorileri olustur
   const categorySlugToId: Record<string, string> = {}
   const allCategoryStats: CategoryStats[] = []
+  const categoryGrowthRates: Record<string, number> = {}
 
   for (const cat of categories) {
     const scraped = udemyData.get(cat.slug)
@@ -243,6 +248,8 @@ async function refreshUdemy() {
     const avgReviews = scraped?.avgReviews || 500
     const searchVolume = trend?.avgVolume || 500000
     const growthRate = trend?.growthRate || 15
+
+    categoryGrowthRates[cat.slug] = growthRate
 
     allCategoryStats.push({
       avgPrice,
@@ -258,6 +265,7 @@ async function refreshUdemy() {
   for (let i = 0; i < categories.length; i++) {
     const cat = categories[i]
     const stats = allCategoryStats[i]
+    const growthRate = categoryGrowthRates[cat.slug] || 15
     const demandScore = calculateDemandScore(stats, allCategoryStats)
     const supplyScore = calculateSupplyScore(stats, allCategoryStats)
 
@@ -353,6 +361,7 @@ async function refreshCapafy() {
   // Kategorileri olustur
   const categorySlugToId: Record<string, string> = {}
   const allCategoryStats: CategoryStats[] = []
+  const categoryGrowthRates: Record<string, number> = {}
 
   for (const cat of categories) {
     const scraped = capafyData.get(cat.slug)
@@ -364,6 +373,8 @@ async function refreshCapafy() {
     const avgReviews = scraped?.avgReviews || 50
     const searchVolume = trend?.avgVolume || 30000
     const growthRate = trend?.growthRate || 25
+
+    categoryGrowthRates[cat.slug] = growthRate
 
     allCategoryStats.push({
       avgPrice,
@@ -379,6 +390,7 @@ async function refreshCapafy() {
   for (let i = 0; i < categories.length; i++) {
     const cat = categories[i]
     const stats = allCategoryStats[i]
+    const growthRate = categoryGrowthRates[cat.slug] || 25
     const demandScore = calculateDemandScore(stats, allCategoryStats)
     const supplyScore = calculateSupplyScore(stats, allCategoryStats)
 
