@@ -20,11 +20,8 @@ FROM oven/bun:1-slim AS runner
 
 WORKDIR /app
 
-# Build'den standalone çıktıyı kopyala
+# Build'den standalone çıktıyı kopyala (icinde mulpaz.db de var)
 COPY --from=builder /app/.next/standalone ./
-
-# SQLite veritabanini kopyala
-COPY --from=builder /app/mulpaz.db ./mulpaz.db
 
 # Prisma runtime
 COPY --from=builder /app/prisma ./prisma
