@@ -146,28 +146,21 @@ export async function fetchKeywordTrends(
 
 /**
  * Birden fazla anahtar kelime icin trend verisi ceker
- * Rate limiting - 3 paralel, 3sn bekleme
+ * Rate limiting - sequential, her biri arasi 2sn bekleme (429 onlemek icin)
  */
 export async function fetchMultipleTrends(
   keywords: string[]
 ): Promise<Map<string, TrendResult>> {
   const results = new Map<string, TrendResult>()
 
-  // Rate limiting: paralel sayisini dusur, beklemeyi artir
-  const batchSize = 3
-  for (let i = 0; i < keywords.length; i += batchSize) {
-    const batch = keywords.slice(i, i + batchSize)
-    const batchResults = await Promise.all(
-      batch.map((kw) => fetchKeywordTrends(kw))
-    )
-    for (let j = 0; j < batch.length; j++) {
-      if (batchResults[j]) {
-        results.set(batch[j], batchResults[j]!)
-      }
+  // Sequential - her seferinde 1 istek, 2sn bekle
+  // Google Trends 429 hatasini onlemek icin paralellik yok
+  for (const keyword of keywords) {
+    const trend = await fetchKeywordTrends(keyword)
+    if (trend) {
+      results.set(keyword, trend)
     }
-    if (i + batchSize < keywords.length) {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-    }
+    await new Promise((resolve) => setTimeout(resolve, 2000))
   }
 
   return results

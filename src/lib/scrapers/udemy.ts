@@ -84,12 +84,12 @@ async function scrapeUdemyCategory(categorySlug: string): Promise<UdemyCourse[]>
 
     // Cloudflare korumasini gecmek icin once ana sayfaya git
     await page.goto(`${UDEMY_BASE}`, { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {})
-    await page.waitForTimeout(2000)
+    await new Promise((r) => setTimeout(r, 2000))
 
     // Asil arama sayfasina git
     const url = `${UDEMY_BASE}/courses/search/?q=${searchQuery}&p=1&page_size=20`
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {})
-    await page.waitForTimeout(3000)
+    await new Promise((r) => setTimeout(r, 3000))
 
     // Kurs listesini sayfadan parse et
     const items = await page.evaluate(() => {

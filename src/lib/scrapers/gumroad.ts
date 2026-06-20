@@ -28,8 +28,34 @@ const GUMROAD_DISCOVER = 'https://gumroad.com/discover'
 
 /**
  * Gumroad Inertia.js JSON API'inden urun verilerini ceker
- * X-Inertia header'i ile direkt JSON doner (Puppeteer gerekmez)
+ * Once HTML sayfasindan Inertia versiyonunu alir, sonra JSON istegi yapar
  */
+async function getInertiaVersion(): Promise<string | null> {
+  try {
+    const htmlRes = await fetch(GUMROAD_DISCOVER, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html',
+      },
+    })
+    const html = await htmlRes.text()
+    // Inertia versiyonunu meta tag'den veya data-page attribute'undan al
+    const versionMatch = html.match(/<meta[^>]+name="inertia-version"[^>]+content="([^"]+)"/i)
+    if (versionMatch?.[1]) return versionMatch[1]
+    // Alternatif: data-page JSON icinden inertia versiyonu
+    const pageMatch = html.match(/data-page="([^"]+)"/)
+    if (pageMatch?.[1]) {
+      try {
+        const pageData = JSON.parse(decodeURIComponent(pageMatch[1]))
+        return pageData.version || null
+      } catch {}
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 async function searchGumroad(query: string, page: number = 1): Promise<{
   products: GumroadProduct[]
   totalResults: number
@@ -40,12 +66,11 @@ async function searchGumroad(query: string, page: number = 1): Promise<{
   let tagsData: { key: string; docCount: number }[] = []
 
   try {
+    // Gumroad Inertia sayfasindan HTML al, data-page attribute'undan JSON cek
     const url = `${GUMROAD_DISCOVER}?query=${encodeURIComponent(query)}&page=${page}&sort=featured`
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-        'X-Inertia': 'true',
-        'X-Inertia-Version': '1',
         'Accept': 'text/html, application/json, */*',
         'Accept-Language': 'en-US,en;q=0.9',
       },
@@ -56,12 +81,33 @@ async function searchGumroad(query: string, page: number = 1): Promise<{
       return { products, totalResults, tagsData }
     }
 
-    const data = await response.json()
+    const text = await response.text()
+    let data: any = null
 
-    // Gumroad Inertia response: { component, props: { search_results: { products, total, tags_data } } }
+    // Yontem 1: Inertia JSON response (X-Inertia header ile donduyse)
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      try { data = JSON.parse(text) } catch {}
+    }
+
+    // Yontem 2: data-page attribute'undan JSON cek
+    if (!data) {
+      const pageMatch = text.match(/data-page="([^"]+)"/)
+      if (pageMatch?.[1]) {
+        try {
+          data = JSON.parse(decodeURIComponent(pageMatch[1]))
+        } catch {}
+      }
+    }
+
+    if (!data) {
+      return { products, totalResults, tagsData }
+    }
+
+    // Inertia response: data.props.search_results
+    // HTML data-page: data.props.search_results
     const searchResults = data?.props?.search_results
     if (!searchResults) {
-      console.warn(`[Gumroad] "${query}" search_results bulunamadi`)
       return { products, totalResults, tagsData }
     }
 
