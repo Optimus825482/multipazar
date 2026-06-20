@@ -12,6 +12,7 @@ RUN bun install
 COPY . .
 ENV DATABASE_URL=file:./mulpaz.db
 RUN bun run db:generate
+RUN bun run db:push
 RUN bun run build
 
 # ---- Stage 2: Runtime ----
@@ -22,13 +23,13 @@ WORKDIR /app
 # Build'den standalone çıktıyı kopyala
 COPY --from=builder /app/.next/standalone ./
 
+# SQLite veritabanini kopyala
+COPY --from=builder /app/mulpaz.db ./mulpaz.db
+
 # Prisma runtime
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-
-# Prisma CLI'yi global kur (6.11.1)
-RUN bun add -g prisma@6.11.1
 
 # Startup script
 COPY scripts/start.sh /app/start.sh

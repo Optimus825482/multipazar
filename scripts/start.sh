@@ -1,10 +1,6 @@
 #!/bin/bash
 set +e
 
-echo "[Startup] Prisma db push calistiriliyor..."
-cd /app
-DATABASE_URL=file:./mulpaz.db bunx --bun prisma@6.11.1 db push --accept-data-loss 2>&1
-
 echo "[Startup] Next.js uygulamasi baslatiliyor..."
 export DATABASE_URL=file:./mulpaz.db
 export HOSTNAME=0.0.0.0
