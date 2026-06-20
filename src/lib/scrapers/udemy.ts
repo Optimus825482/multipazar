@@ -1,4 +1,4 @@
-import cloudscraper from 'cloudscraper'
+import puppeteer, { Browser } from 'puppeteer'
 
 export interface UdemyCourse {
   name: string
@@ -27,9 +27,31 @@ export interface UdemyCategoryData {
 
 const UDEMY_BASE = 'https://www.udemy.com'
 
-/**
- * Kategori slug -> Udemy arama terimi
- */
+let browser: Browser | null = null
+
+async function getBrowser(): Promise<Browser> {
+  if (!browser) {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process',
+      ],
+    })
+  }
+  return browser
+}
+
+async function closeBrowser() {
+  if (browser) {
+    await browser.close()
+    browser = null
+  }
+}
+
 function categoryToSearchQuery(slug: string): string {
   const map: Record<string, string> = {
     'software-development': 'software-development',
@@ -49,51 +71,111 @@ function categoryToSearchQuery(slug: string): string {
 }
 
 /**
- * Cloudscraper ile Udemy API'den gerçek kurs verilerini çeker
- * Cloudflare korumasini otomatik bypass eder
+ * Puppeteer ile Udemy'ye baglan, Cloudflare'i gec, kurs verilerini sayfadan parse et
  */
 async function scrapeUdemyCategory(categorySlug: string): Promise<UdemyCourse[]> {
   const searchQuery = categoryToSearchQuery(categorySlug)
   const courses: UdemyCourse[] = []
 
   try {
-    // Udemy public API - Cloudflare korumasini cloudscraper gecer
-    const apiUrl = `https://www.udemy.com/api-2.0/courses/?search=${searchQuery}&page=1&page_size=15&fields[course]=@all&language=en`
+    const page = await (await getBrowser()).newPage()
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    await page.setViewport({ width: 1366, height: 768 })
 
-    const response = await cloudscraper({
-      uri: apiUrl,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': `${UDEMY_BASE}/courses/search/?q=${searchQuery}`,
-        'Origin': UDEMY_BASE,
-      },
-      timeout: 20000,
+    // Cloudflare korumasini gecmek icin once ana sayfaya git
+    await page.goto(`${UDEMY_BASE}`, { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {})
+    await page.waitForTimeout(2000)
+
+    // Asil arama sayfasina git
+    const url = `${UDEMY_BASE}/courses/search/?q=${searchQuery}&p=1&page_size=20`
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {})
+    await page.waitForTimeout(3000)
+
+    // Kurs listesini sayfadan parse et
+    const items = await page.evaluate(() => {
+      const results: any[] = []
+
+      // Udemy course card'larini bul
+      const cards = document.querySelectorAll('[class*="course-card"], [data-purpose="course-card"], [class*="card"]')
+      cards.forEach((card) => {
+        const titleEl = card.querySelector('[data-purpose="course-title-url"], [class*="title"]')
+        const priceEl = card.querySelector('[data-purpose="price-text"], [class*="price"]')
+        const ratingEl = card.querySelector('[data-purpose="rating-number"], [class*="rating-number"]')
+        const studentsEl = card.querySelector('[class*="enrollment"], [class*="student"]')
+        const instructorEl = card.querySelector('[class*="instructor"]')
+        const linkEl = card.querySelector('a[href*="/course/"]')
+
+        if (titleEl?.textContent) {
+          results.push({
+            name: titleEl.textContent.trim(),
+            price: priceEl?.textContent?.replace(/[^0-9.]/g, '') || '0',
+            rating: ratingEl?.textContent?.trim() || '0',
+            students: studentsEl?.textContent?.replace(/[^0-9k]/g, '').replace('k', '000') || '0',
+            instructor: instructorEl?.textContent?.trim() || '',
+            url: (linkEl as HTMLAnchorElement)?.href || '',
+          })
+        }
+      })
+
+      return results
     })
 
-    const data = typeof response === 'string' ? JSON.parse(response) : response
+    for (const item of items) {
+      if (!item.name) continue
+      const price = parseFloat(item.price) || 0
+      const rating = parseFloat(item.rating) || 0
+      let studentCount = parseInt(item.students) || 0
+      if (item.students.includes('k')) {
+        studentCount = Math.round(parseFloat(item.students) * 1000)
+      }
 
-    if (data?.results) {
-      for (const item of data.results) {
-        if (!item.title) continue
+      courses.push({
+        name: item.name,
+        price,
+        rating,
+        reviewCount: 0,
+        studentCount,
+        instructor: item.instructor || 'Udemy Instructor',
+        url: item.url,
+        isTrending: false,
+        tags: searchQuery,
+        avgMonthlyEnroll: studentCount > 0 ? Math.round(studentCount / 12) : 0,
+        demandScore: 0,
+        supplyScore: 0,
+      })
+    }
+
+    // Eger card'lardan parse edilemediyse, sayfadaki tum linkleri dene
+    if (courses.length === 0) {
+      const links = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll('a[href*="/course/"]'))
+          .slice(0, 15)
+          .map((a) => ({
+            name: a.textContent?.trim() || '',
+            url: (a as HTMLAnchorElement).href,
+          }))
+          .filter((l) => l.name.length > 10)
+      })
+
+      for (const link of links) {
         courses.push({
-          name: item.title,
-          price: parseFloat(item.price?.amount || '0') || 0,
-          rating: item.avg_rating || 0,
-          reviewCount: item.num_reviews || 0,
-          studentCount: item.num_subscribers || 0,
-          instructor: item.visible_instructors?.[0]?.display_name || 'Udemy Instructor',
-          url: `${UDEMY_BASE}${item.url || ''}`,
-          isTrending: item.is_published || false,
+          name: link.name,
+          price: 0,
+          rating: 0,
+          reviewCount: 0,
+          studentCount: 0,
+          instructor: 'Udemy Instructor',
+          url: link.url,
+          isTrending: false,
           tags: searchQuery,
-          avgMonthlyEnroll: Math.round((item.num_subscribers || 0) / 12),
+          avgMonthlyEnroll: 0,
           demandScore: 0,
           supplyScore: 0,
         })
       }
     }
+
+    await page.close()
   } catch (error: any) {
     console.error(`[Udemy Scraper] "${categorySlug}" hatasi: ${error?.message || error}`)
   }
@@ -101,9 +183,6 @@ async function scrapeUdemyCategory(categorySlug: string): Promise<UdemyCourse[]>
   return courses
 }
 
-/**
- * Bir kategori icin Udemy'den veri ceker ve analiz eder
- */
 export async function fetchUdemyCategory(categorySlug: string): Promise<UdemyCategoryData | null> {
   const courses = await scrapeUdemyCategory(categorySlug)
 
@@ -127,30 +206,21 @@ export async function fetchUdemyCategory(categorySlug: string): Promise<UdemyCat
   }
 }
 
-/**
- * Tum Udemy kategorilerini ceker (paralel batch)
- */
 export async function fetchAllUdemyCategories(
   categorySlugs: string[]
 ): Promise<Map<string, UdemyCategoryData>> {
   const results = new Map<string, UdemyCategoryData>()
 
-  // 4 paralel, rate limiting
-  const batchSize = 4
-  for (let i = 0; i < categorySlugs.length; i += batchSize) {
-    const batch = categorySlugs.slice(i, i + batchSize)
-    const batchResults = await Promise.all(
-      batch.map((slug) => fetchUdemyCategory(slug))
-    )
-    for (let j = 0; j < batch.length; j++) {
-      if (batchResults[j]) {
-        results.set(batch[j], batchResults[j]!)
-      }
+  // Sequential - browser tek, rate limiting icin
+  for (const slug of categorySlugs) {
+    const data = await fetchUdemyCategory(slug)
+    if (data && data.courses.length > 0) {
+      results.set(slug, data)
     }
-    if (i + batchSize < categorySlugs.length) {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-    }
+    await new Promise((resolve) => setTimeout(resolve, 2000))
   }
+
+  await closeBrowser()
 
   return results
 }

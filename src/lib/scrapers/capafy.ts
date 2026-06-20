@@ -23,32 +23,26 @@ export interface CapafyCategoryData {
   products: CapafyProduct[]
 }
 
-/**
- * Capafy.ai - Gerçek AI Agent/Skills Marketplace API'si
- * API Base: https://api.capafy.ai
- * 
- * Endpoint: POST /agent/agents/search
- * - query: dogal dil arama sorgusu
- * - Sayfalanmis sonuc doner
- * - Public endpoint, API key gerekmez
- */
-
 const CAPAFY_API = 'https://api.capafy.ai'
 
 /**
  * Capafy.ai search API'sinden gerçek agent/skill verilerini çeker
+ * POST /agent/agents/search - query body'de JSON olarak gönderilir
+ * Not: pageSize parametresi query string'de, query body'de JSON icinde
  */
 async function searchCapafy(query: string, pageSize: number = 10): Promise<CapafyProduct[]> {
   const products: CapafyProduct[] = []
 
   try {
-    const response = await fetch(`${CAPAFY_API}/agent/agents/search?query=${encodeURIComponent(query)}&pageSize=${pageSize}&page=1`, {
+    const url = `${CAPAFY_API}/agent/agents/search?pageSize=${pageSize}&page=1`
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
+      body: JSON.stringify({ query }),
     })
 
     if (!response.ok) {
@@ -57,35 +51,35 @@ async function searchCapafy(query: string, pageSize: number = 10): Promise<Capaf
     }
 
     const body = await response.json()
-    
-    // R<T> envelope: { code: 0, msg: "success", data: {...} }
+
+    // R<T> envelope: { code: 0, msg: "ok", data: { list: [...] } }
     if (body.code !== 0 || !body.data) {
-      console.warn(`[Capafy API] "${query}" business error: ${body.msg}`)
+      console.warn(`[Capafy API] "${query}" error: ${body.msg}`)
       return products
     }
 
-    const agents = body.data.records || body.data.items || body.data.agents || []
-    
+    const agents = body.data.list || []
+
     for (const agent of agents) {
-      const name = agent.name || agent.title || ''
-      const price = parseFloat(agent.price || agent.pricing?.amount || '0')
-      const rating = parseFloat(agent.rating || agent.stars || '0')
-      const reviewCount = parseInt(agent.reviewCount || agent.reviews || '0')
-      const salesCount = parseInt(agent.salesCount || agent.sales || '0')
-      const creator = agent.creator?.name || agent.author?.name || agent.vendor?.name || 'Capafy Creator'
-      const url = agent.url || agent.agentUrl || ''
-      const tags = (agent.tags || agent.categories || []).join(',') || query
+      const name = agent.title || ''
+      const price = parseFloat(agent.billings?.[0]?.cyclePrice || agent.billings?.[0]?.oneTimeFee || '0')
+      const rating = parseFloat(agent.rating || '0')
+      const reviewCount = parseInt(agent.agentCard?.reviewCount || '0')
+      const salesCount = parseInt(agent.salesVolume || '0')
+      const creator = agent.developerName || agent.agentCard?.developerName || 'Capafy Creator'
+      const tags = agent.tags || query
+      const urlSuffix = agent.urlSuffix
 
       if (name && price > 0) {
         products.push({
           name,
           price,
-          rating: rating > 5 ? rating / 2 : rating, // normalize 0-5
+          rating: rating > 5 ? rating / 2 : rating,
           reviewCount,
           salesCount,
           creator,
-          url: url.startsWith('http') ? url : `https://capafy.ai${url}`,
-          isTrending: agent.isTrending || agent.trending || false,
+          url: urlSuffix ? `https://capafy.ai/agent/${urlSuffix}` : `https://capafy.ai/agent/${agent.agentId}`,
+          isTrending: salesCount > 10,
           tags,
           avgMonthlySales: salesCount > 0 ? Math.round(salesCount / 3) : 0,
           demandScore: 0,
@@ -100,30 +94,21 @@ async function searchCapafy(query: string, pageSize: number = 10): Promise<Capaf
   return products
 }
 
-/**
- * Kategori slug -> sorgu terimi
- */
-function categoryToQuery(slug: string): string {
-  const map: Record<string, string> = {
-    'prompt-engineering': 'prompt engineering ChatGPT',
-    'ai-chatbot-agent': 'AI chatbot agent assistant',
-    'ai-video-generation': 'AI video generation Sora',
-    'ai-image-generation': 'AI image generation Midjourney',
-    'ai-audio-voice': 'AI voice audio ElevenLabs',
-    'ai-automation': 'AI automation workflow n8n',
-    'ai-development': 'AI development LangChain API',
-    'ai-marketing': 'AI marketing content SEO',
-    'ai-data-analytics': 'AI data analytics analysis',
-    'ai-education': 'AI education learning course',
-    'ai-writing': 'AI writing copywriting content',
-    'ai-business': 'AI business productivity tool',
-  }
-  return map[slug] || slug.replace(/-/g, ' ')
+const CATEGORY_QUERIES: Record<string, string> = {
+  'prompt-engineering': 'prompt engineering',
+  'ai-chatbot-agent': 'AI chatbot agent assistant',
+  'ai-video-generation': 'AI video generation',
+  'ai-image-generation': 'AI image generation',
+  'ai-audio-voice': 'AI voice audio speech',
+  'ai-automation': 'AI automation workflow',
+  'ai-development': 'AI development API',
+  'ai-marketing': 'AI marketing content',
+  'ai-data-analytics': 'AI data analytics',
+  'ai-education': 'AI education learning',
+  'ai-writing': 'AI writing copywriting',
+  'ai-business': 'AI business productivity',
 }
 
-/**
- * Kategori adi mapping
- */
 const CATEGORY_NAMES: Record<string, string> = {
   'prompt-engineering': 'Prompt Mühendisligi',
   'ai-chatbot-agent': 'AI Chatbot & Agent',
@@ -139,12 +124,9 @@ const CATEGORY_NAMES: Record<string, string> = {
   'ai-business': 'AI Is Araclari',
 }
 
-/**
- * Bir AI kategorisi icin Capafy'den veri ceker
- */
 export async function fetchCapafyCategory(categorySlug: string): Promise<CapafyCategoryData | null> {
-  const query = categoryToQuery(categorySlug)
-  const products = await searchCapafy(query, 15)
+  const query = CATEGORY_QUERIES[categorySlug] || categorySlug.replace(/-/g, ' ')
+  const products = await searchCapafy(query, 10)
 
   if (products.length === 0) {
     return null
@@ -166,15 +148,11 @@ export async function fetchCapafyCategory(categorySlug: string): Promise<CapafyC
   }
 }
 
-/**
- * Tum Capafy kategorilerini ceker (paralel batch)
- */
 export async function fetchAllCapafyCategories(
   categorySlugs: string[]
 ): Promise<Map<string, CapafyCategoryData>> {
   const results = new Map<string, CapafyCategoryData>()
 
-  // 4 paralel, rate limiting
   const batchSize = 4
   for (let i = 0; i < categorySlugs.length; i += batchSize) {
     const batch = categorySlugs.slice(i, i + batchSize)
