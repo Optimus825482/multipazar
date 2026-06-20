@@ -3,71 +3,120 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String
-  slug        String    @unique
-  description String?
-  icon        String?
-  color       String?
-  avgPrice    Float
-  totalProducts   Int
+  id              String    @id @default(cuid())
+  platform        String    // "gumroad" | "udemy" | "capafy"
+  name            String
+  slug            String
+  description     String?
+  icon            String?
+  color           String?
+  avgPrice        Float
+  totalProducts   Int       @default(0)
+  totalCourses    Int       @default(0)
   totalRevenue    Float
+  totalStudents   Int?      // Udemy-specific
   searchVolume    Int
   demandScore     Float
   supplyScore     Float
   competitionIndex Float
   growthRate      Float
-  trendDirection  String   // "up", "down", "stable"
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  products   Product[]
+  trendDirection  String    @default("up") // "up", "down", "stable"
+  avgRating       Float?
+  avgReviews      Int?
+  source          String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  products        Product[]
+
+  @@unique([platform, slug])
 }
 
 model Product {
   id              String    @id @default(cuid())
+  platform        String    // "gumroad" | "udemy" | "capafy"
   name            String
   categoryId      String
   category        Category  @relation(fields: [categoryId], references: [id])
   price           Float
-  salesCount      Int
-  revenue         Float
-  rating          Float
-  reviewCount     Int
-  searchVolume    Int
+  salesCount      Int       @default(0)
+  studentCount    Int?      // Udemy-specific
+  revenue         Float     @default(0)
+  rating          Float     @default(0)
+  reviewCount     Int       @default(0)
+  searchVolume    Int?      @default(0)
   demandScore     Float
   supplyScore     Float
-  opportunityScore Float
-  tags            String    // comma separated
-  createdAt       String
-  updatedAt       String
+  opportunityScore Float    @default(0)
+  tags            String    @default("")
   description     String?
   seller          String?
-  type            String    // "template", "course", "ebook", "software", "design", "audio", "other"
-  avgMonthlySales Int
-  priceRange      String    // "budget", "mid", "premium"
+  instructor      String?   // Udemy-specific
+  creator         String?   // Capafy-specific
+  type            String    @default("other") // "template", "course", "ebook", "software", "design", "audio", "other"
+  avgMonthlySales Int?      @default(0)
+  avgMonthlyEnroll Int?     // Udemy-specific
+  priceRange      String    @default("mid") // "budget", "mid", "premium"
   isTrending      Boolean   @default(false)
+  url             String?
+  gumroadUrl      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model MarketInsight {
   id          String   @id @default(cuid())
+  platform    String   // "gumroad" | "udemy" | "capafy"
   title       String
   description String
   insightType String   // "opportunity", "trend", "warning", "tip"
   categoryId  String?
   impactScore Float
+  source      String?
   createdAt   DateTime @default(now())
 }
 
 model SearchTrend {
   id          String   @id @default(cuid())
+  platform    String   // "gumroad" | "udemy" | "capafy"
   keyword     String
   categorySlug String?
   month       String   // "2024-01", "2024-02", etc.
   volume      Int
+  growthRate  Float?
   createdAt   DateTime @default(now())
+
+  @@unique([platform, keyword, month])
+}
+
+model RefreshLog {
+  id        String   @id @default(cuid())
+  platform  String   // "gumroad" | "udemy" | "capafy" | "all"
+  status    String   // "success" | "error"
+  duration  Int      // duration in ms
+  message   String?
+  createdAt DateTime @default(now())
+}
+
+model ProductIdea {
+  id          String   @id @default(cuid())
+  platform    String   // "gumroad" | "udemy" | "capafy"
+  name        String
+  category    String
+  estimatedPrice    Float
+  estimatedMonthlySales Int     @default(0)
+  estimatedMonthlyEnroll  Int?  // Udemy-specific
+  estimatedMonthlyRevenue Float @default(0)
+  demandScore   Float
+  supplyScore   Float
+  gapScore      Float
+  difficulty    String   @default("Orta")
+  timeToCreate  String
+  reason        String
+  sourceUrl     String?
+  createdAt     DateTime @default(now())
 }

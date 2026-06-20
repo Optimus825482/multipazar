@@ -13,13 +13,14 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { toast } from '@/hooks/use-toast'
 import {
   TrendingUp, DollarSign, Search,
   Zap, Target, BarChart3, Lightbulb, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Star, Package,
   Flame, Crown, Layers, PieChart as PieIcon, Sparkles, Shield,
   Timer, Users, Activity, Globe, ShoppingCart, GraduationCap, Bot,
-  GitCompare, ChevronRight, ExternalLink, Trophy,
+  GitCompare, ChevronRight, ExternalLink, Trophy, RefreshCw, Clock,
 } from 'lucide-react'
 
 interface Category {
@@ -119,6 +120,7 @@ interface PlatformData {
   topCategories: Category[]
   fastestGrowing: Category[]
   lowestCompetition: Category[]
+  lastUpdated?: string
 }
 
 interface CompareData {
@@ -126,6 +128,7 @@ interface CompareData {
   crossMarketOpportunities: any[]
   comparisonMetrics: any[]
   platformStrengths: any[]
+  lastUpdated?: string
 }
 
 const CHART_COLORS = ['#f97316', '#8b5cf6', '#06b6d4', '#ec4899', '#10b981', '#f43f5e', '#a855f7', '#14b8a6', '#eab308', '#3b82f6', '#22c55e', '#6366f1']
@@ -642,23 +645,81 @@ export default function Home() {
   const [platformData, setPlatformData] = useState<Record<string, PlatformData | null>>({ gumroad: null, udemy: null, capafy: null })
   const [compareData, setCompareData] = useState<CompareData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
+  // Fetch platform data
+  async function fetchPlatformData() {
+    try {
+      const [gumroad, udemy, capafy] = await Promise.all([
+        fetch('/api/market').then(r => r.json()).catch(() => null),
+        fetch('/api/udemy').then(r => r.json()).catch(() => null),
+        fetch('/api/capafy').then(r => r.json()).catch(() => null),
+      ])
+      setPlatformData({ gumroad, udemy, capafy })
+      // Get latest timestamp from any platform
+      const ts = gumroad?.lastUpdated || udemy?.lastUpdated || capafy?.lastUpdated
+      if (ts) setLastUpdated(ts)
+    } catch (e) {
+      console.error('Fetch error:', e)
+    }
+  }
+
+  // Manual refresh
+  async function handleRefresh() {
+    setIsRefreshing(true)
+    try {
+      const res = await fetch('/api/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (data.status === 'success' || data.status === 'partial') {
+        // Refresh all platform data
+        await fetchPlatformData()
+        // Also refresh compare data if active
+        if (activePlatform === 'compare') {
+          fetch('/api/compare').then(r => r.json()).then(setCompareData).catch(() => {})
+        }
+        toast({
+          title: 'Veriler Guncellendi',
+          description: `${new Date().toLocaleString('tr-TR')} itibariyle 3 platform verisi yenilendi`,
+        })
+      } else {
+        toast({ title: 'Hata', description: 'Veri yenileme basarisiz', variant: 'destructive' })
+      }
+    } catch (e) {
+      toast({ title: 'Hata', description: 'Sunucu hatasi', variant: 'destructive' })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Initial data load
   useEffect(() => {
-    async function fetchAll() {
+    async function init() {
+      await fetchPlatformData()
+      setLoading(false)
+      // Background refresh: sayfa yuklenince arka planda verileri tazele
       try {
+        await fetch('/api/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
         const [gumroad, udemy, capafy] = await Promise.all([
           fetch('/api/market').then(r => r.json()).catch(() => null),
           fetch('/api/udemy').then(r => r.json()).catch(() => null),
           fetch('/api/capafy').then(r => r.json()).catch(() => null),
         ])
         setPlatformData({ gumroad, udemy, capafy })
-      } catch (e) {
-        console.error('Fetch error:', e)
-      } finally {
-        setLoading(false)
-      }
+        const ts = gumroad?.lastUpdated || udemy?.lastUpdated || capafy?.lastUpdated
+        if (ts) setLastUpdated(ts)
+        toast({ title: 'Veriler Guncellendi', description: 'Sayfa yuklendiginde otomatik guncellendi' })
+      } catch { /* background refresh failed, cached data is fine */ }
     }
-    fetchAll()
+    init()
   }, [])
 
   useEffect(() => {
@@ -706,6 +767,24 @@ export default function Home() {
               <Badge variant="secondary" className="flex sm:flex items-center gap-1 text-[10px] sm:text-xs">
                 <Globe className="w-3 h-3" />3 Pazar
               </Badge>
+              {/* Son Guncelleme Zamani */}
+              {lastUpdated && (
+                <Badge variant="outline" className="hidden md:flex items-center gap-1 text-[10px] sm:text-xs bg-white border-orange-200">
+                  <Clock className="w-3 h-3 text-orange-500" />
+                  <span className="text-muted-foreground">
+                    {new Date(lastUpdated).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </Badge>
+              )}
+              {/* Yenile Butonu */}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-medium shadow-md hover:shadow-lg hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isRefreshing ? 'Guncelleniyor...' : 'Guncelle'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -757,7 +836,7 @@ export default function Home() {
                     <CardContent className="p-3 sm:p-5">
                       <div className="flex items-center gap-2.5 sm:gap-3 mb-3 sm:mb-4">
                         <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${p.color}15` }}>
-                          <PlatformIcon platform={p.name.toLowerCase().replace(/ ai/g, "")} className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: p.color } as any} />
+                          <PlatformIcon platform={p.name.toLowerCase().replace(/ ai/g, "")} className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
                         <div>
                           <h3 className="font-bold text-sm sm:text-lg">{p.name}</h3>
@@ -927,6 +1006,14 @@ export default function Home() {
             <div className="text-[11px] sm:text-xs text-muted-foreground text-center">
               Gumroad + Udemy + Capafy AI | Gercek Pazar Verileri | Karsilastirmali Analiz
             </div>
+            {lastUpdated && (
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
+                <Clock className="w-3 h-3 text-orange-400" />
+                <span>Son Guncelleme: {new Date(lastUpdated).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  <span className="ml-1">(otomatik her 6 saatte bir)</span>
+                </span>
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
               <Badge variant="outline" className="text-orange-600 border-orange-200 text-[10px] sm:text-xs"><ShoppingCart className="w-3 h-3 mr-1" />Gumroad</Badge>
               <Badge variant="outline" className="text-violet-600 border-violet-200 text-[10px] sm:text-xs"><GraduationCap className="w-3 h-3 mr-1" />Udemy</Badge>

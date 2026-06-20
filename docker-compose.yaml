@@ -6,15 +6,16 @@ services:
     container_name: mulpaz-app
     restart: unless-stopped
     ports:
-      - "3000"
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - HOSTNAME=0.0.0.0
       - PORT=3000
-      - DATABASE_URL=file:/app/db/custom.db
+      - DATABASE_URL=postgresql://mulpaz:mulpaz@localhost:5432/mulpaz
       - NEXT_PUBLIC_BASE_URL=https://market.erkanerdem.online
+      - CRON_SECRET=mulpaz-cron-secret-2026
     volumes:
-      - mulpaz-db:/app/db
+      - mulpaz-pgdata:/var/lib/postgresql/data
 
 volumes:
-  mulpaz-db:
+  mulpaz-pgdata:

@@ -1,4 +1,7 @@
-# ---- Build Stage ----
+# ---- Multi-stage Build ----
+# Tek container: Next.js + PostgreSQL birlikte
+
+# ---- Stage 1: Builder ----
 FROM oven/bun:1 AS builder
 
 WORKDIR /app
@@ -7,32 +10,32 @@ COPY package.json bun.lock ./
 RUN bun install
 
 COPY . .
-ENV DATABASE_URL=file:/app/db/custom.db
+ENV DATABASE_URL=postgresql://mulpaz:mulpaz@localhost:5432/mulpaz
 RUN bun run db:generate
-RUN bun run db:push
 RUN bun run build
 
-# ---- Runtime Stage ----
+# ---- Stage 2: Runtime ----
 FROM oven/bun:1-slim AS runner
+
+# PostgreSQL kurulumu
+RUN apt-get update -qq && \
+    apt-get install -y -qq postgresql postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV HOSTNAME=0.0.0.0
-ENV PORT=3000
-ENV DATABASE_URL=file:/app/db/custom.db
-
-# Build script zaten static + public klasorlerini standalone icine kopyaladi
+# Build'den standalone çıktıyı kopyala
 COPY --from=builder /app/.next/standalone ./
 
-# SQLite veritabani (build'te db push yapilmis hali)
-COPY --from=builder /app/db ./db
-
-# Prisma runtime engine (platform-specific, build imajindan kopyala)
+# Prisma runtime
+COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# Startup script
+COPY scripts/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 EXPOSE 3000
 
-CMD ["bun", "server.js"]
+CMD ["/app/start.sh"]
