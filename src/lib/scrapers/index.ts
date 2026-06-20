@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { fetchKeywordTrends, fetchMultipleTrends, getSearchTermsForCategory, TrendResult } from './trends'
 import { fetchAllUdemyCategories, UdemyCategoryData } from './udemy'
 import { fetchAllCapafyCategories, CapafyCategoryData } from './capafy'
+import { fetchAllGumroadCategories, GumroadCategoryData } from './gumroad'
 import {
   calculateDemandScore,
   calculateSupplyScore,
@@ -87,8 +88,8 @@ async function saveTrendData(platform: Platform, trendResults: Map<string, Trend
 }
 
 /**
- * Gumroad verilerini Google Trends + seed data ile yeniler
- * Not: Gumroad scraping son asamada eklenecek
+ * Gumroad verilerini Gumroad Inertia JSON API + Google Trends ile yeniler
+ * X-Inertia header'i sayesinde direkt JSON doner (Puppeteer gerekmez)
  */
 async function refreshGumroad() {
   const platform: Platform = 'gumroad'
@@ -107,23 +108,32 @@ async function refreshGumroad() {
   const allSearchTerms = categories.flatMap((cat) => getSearchTermsForCategory(cat.slug, 'gumroad'))
   const trendResults = await fetchMultipleTrends(allSearchTerms)
 
+  // Gumroad Inertia API ile gercek urun verilerini cek
+  const gumroadSlugs = categories.map((c) => c.slug)
+  const gumroadData = await fetchAllGumroadCategories(gumroadSlugs)
+
   // Kategorileri olustur
   const categorySlugToId: Record<string, string> = {}
   const allCategoryStats: CategoryStats[] = []
 
   for (const cat of categories) {
+    const scraped = gumroadData.get(cat.slug)
     const trend = trendResults.get(getSearchTermsForCategory(cat.slug, 'gumroad')[0])
 
+    const totalProducts = scraped?.totalProducts || 100
+    const avgPrice = scraped?.avgPrice || 35
+    const avgRating = scraped?.avgRating || 4.3
+    const avgReviews = scraped?.avgReviews || 50
     const searchVolume = trend?.avgVolume || 15000
     const growthRate = trend?.growthRate || 15
 
     allCategoryStats.push({
-      avgPrice: 35,
-      totalProducts: 1000,
-      totalRevenue: searchVolume * 30,
+      avgPrice,
+      totalProducts,
+      totalRevenue: totalProducts * avgPrice * 30,
       searchVolume,
-      avgRating: 4.3,
-      avgReviews: 100,
+      avgRating,
+      avgReviews,
       totalStudents: 0,
     })
   }
@@ -151,14 +161,48 @@ async function refreshGumroad() {
         competitionIndex: calculateCompetitionIndex(demandScore, supplyScore),
         growthRate,
         trendDirection: determineTrendDirection(growthRate),
-        source: 'Google Trends + Gumroad API',
+        source: 'Gumroad Inertia API + Google Trends',
       },
     })
     categorySlugToId[cat.slug] = created.id
   }
 
+  // Gumroad API'den gelen urunleri kaydet
+  for (const [, catData] of gumroadData) {
+    const categoryId = categorySlugToId[catData.slug]
+    if (!categoryId) continue
+
+    for (const product of catData.products) {
+      await db.product.create({
+        data: {
+          platform,
+          name: product.name,
+          categoryId,
+          price: product.price,
+          salesCount: product.reviewCount,
+          revenue: Math.round(product.price * product.reviewCount),
+          rating: product.rating,
+          reviewCount: product.reviewCount,
+          demandScore: product.demandScore || 5,
+          supplyScore: product.supplyScore || 5,
+          opportunityScore: calculateOpportunityScore(product.demandScore || 5, product.supplyScore || 5),
+          tags: product.tags,
+          type: 'other',
+          avgMonthlySales: product.avgMonthlySales || 0,
+          priceRange: product.price > 50 ? 'premium' : product.price > 20 ? 'mid' : 'budget',
+          isTrending: product.rating >= 4.5,
+          instructor: product.seller,
+          url: product.url,
+        },
+      }).catch((err) => console.error(`[Gumroad] Urun kaydetme hatasi: ${product.name}`, err.message))
+    }
+  }
+
   // Trend verisini kaydet
   await saveTrendData(platform, trendResults)
+
+  // Insightlari olustur
+  await generateInsights(platform, allCategoryStats, trendResults)
 }
 
 /**
