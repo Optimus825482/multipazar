@@ -11,11 +11,6 @@ services:
       - NODE_ENV=production
       - HOSTNAME=0.0.0.0
       - PORT=3000
-      - DATABASE_URL=postgresql://mulpaz:mulpaz@localhost:5432/mulpaz
+      - DATABASE_URL=file:./mulpaz.db
       - NEXT_PUBLIC_BASE_URL=https://market.erkanerdem.online
       - CRON_SECRET=mulpaz-cron-secret-2026
-    volumes:
-      - mulpaz-pgdata:/var/lib/postgresql/data
-
-volumes:
-  mulpaz-pgdata:

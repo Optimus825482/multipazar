@@ -1,5 +1,5 @@
 # ---- Multi-stage Build ----
-# Tek container: Next.js + PostgreSQL birlikte
+# Tek container: Next.js + SQLite
 
 # ---- Stage 1: Builder ----
 FROM oven/bun:1 AS builder
@@ -10,17 +10,12 @@ COPY package.json bun.lock ./
 RUN bun install
 
 COPY . .
-ENV DATABASE_URL=postgresql://mulpaz:mulpaz@localhost:5432/mulpaz
+ENV DATABASE_URL=file:./mulpaz.db
 RUN bun run db:generate
 RUN bun run build
 
 # ---- Stage 2: Runtime ----
 FROM oven/bun:1-slim AS runner
-
-# PostgreSQL kurulumu
-RUN apt-get update -qq && \
-    apt-get install -y -qq postgresql postgresql-client && \
-    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
