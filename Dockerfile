@@ -14,6 +14,7 @@ ENV DATABASE_URL=file:./mulpaz.db
 RUN bun run db:generate
 RUN bun run db:push
 RUN bun run build
+RUN cp mulpaz.db .next/standalone/
 
 # ---- Stage 2: Runtime ----
 FROM oven/bun:1-slim AS runner
