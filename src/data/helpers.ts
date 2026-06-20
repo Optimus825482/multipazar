@@ -1,4 +1,7 @@
-import { Product, Category, TrendData } from './types'
+/**
+ * Helper fonksiyonlar - artik gercek veri tabanli
+ * generateTrendData kaldirildi, yerine Google Trends kullaniliyor
+ */
 
 export function formatNumber(n: number): string {
   if (n >= 1000000000) return `$${(n / 1000000000).toFixed(1)}B`
@@ -28,18 +31,6 @@ export function getOverviewCount(overview: any): number {
 
 export function calcOpportunityScore(demandScore: number, supplyScore: number): number {
   return Math.max(0, Math.round((demandScore * 10 - supplyScore * 8) * 10) / 10)
-}
-
-export function generateTrendData(
-  slug: string,
-  growthRate: number,
-  avgVolume: number,
-  months: number = 12
-): { month: string; volume: number }[] {
-  return Array.from({ length: months }, (_, i) => ({
-    month: `2025-${String(i + 1).padStart(2, '0')}`,
-    volume: Math.round(avgVolume * Math.pow(1 + growthRate / 1200, i) * (0.9 + Math.random() * 0.2)),
-  }))
 }
 
 export function sortTopCategories(categories: any[], field: string, limit: number = 5) {
@@ -101,7 +92,7 @@ export async function getPlatformDataFromDB(platform: string): Promise<{
   }
 }
 
-export function buildTrendDataFromDB(dbTrends: any[]): TrendData[] {
+export function buildTrendDataFromDB(dbTrends: any[]): any[] {
   const grouped: Record<string, { keyword: string; data: { month: string; volume: number }[] }> = {}
   for (const t of dbTrends) {
     if (!grouped[t.keyword]) {
