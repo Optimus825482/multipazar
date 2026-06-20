@@ -26,7 +26,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/.bin ./node_modules/.bin
+
+# Prisma CLI'yi global kur (6.11.1)
+RUN bun add -g prisma@6.11.1
 
 # Startup script
 COPY scripts/start.sh /app/start.sh
