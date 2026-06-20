@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, RadarChart, PolarGrid,
@@ -22,6 +22,7 @@ import {
   Timer, Users, Activity, Globe, ShoppingCart, GraduationCap, Bot,
   GitCompare, ChevronRight, ExternalLink, Trophy, RefreshCw, Clock,
 } from 'lucide-react'
+import { RefreshProgress } from '@/components/refresh-progress'
 
 interface Category {
   id?: string
@@ -647,6 +648,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const refreshProgressRef = useRef<any>(null)
 
   // Fetch platform data
   async function fetchPlatformData() {
@@ -665,26 +667,51 @@ export default function Home() {
     }
   }
 
-  // Manual refresh
+  // Manuel refresh
   async function handleRefresh() {
     setIsRefreshing(true)
     try {
+      // Platform status'lerini guncelle
+      const rp = (window as any).__refreshProgress
+      if (rp) {
+        rp.updatePlatformStatus('gumroad', 'loading')
+        setTimeout(() => rp.updatePlatformStatus('udemy', 'loading'), 2000)
+        setTimeout(() => rp.updatePlatformStatus('capafy', 'loading'), 4000)
+      }
+
       const res = await fetch('/api/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
       const data = await res.json()
-      if (data.status === 'success' || data.status === 'partial') {
-        // Refresh all platform data
-        await fetchPlatformData()
-        // Also refresh compare data if active
+      
+      // Platform sonuclarina gore status guncelle
+      if (data.results) {
+        data.results.forEach((r: any) => {
+          if (rp) rp.updatePlatformStatus(r.platform, r.status === 'success' ? 'success' : 'error')
+        })
+      }
+
+      if (data.status === 'success' || data.status === 'partial' || data.status === 'started') {
+        // Islemi baslatti - verileri guncelle
+        if (data.status !== 'started') {
+          await fetchPlatformData()
+        } else {
+          // Background refresh basladi, 5sn sonra verileri tazele
+          setTimeout(async () => {
+            await fetchPlatformData()
+            if (activePlatform === 'compare') {
+              fetch('/api/compare').then(r => r.json()).then(setCompareData).catch(() => {})
+            }
+          }, 5000)
+        }
         if (activePlatform === 'compare') {
           fetch('/api/compare').then(r => r.json()).then(setCompareData).catch(() => {})
         }
         toast({
-          title: 'Veriler Guncellendi',
-          description: `${new Date().toLocaleString('tr-TR')} itibariyle 3 platform verisi yenilendi`,
+          title: 'Veriler Guncelleniyor',
+          description: 'Platform verileri arka planda yenileniyor...',
         })
       } else {
         toast({ title: 'Hata', description: 'Veri yenileme basarisiz', variant: 'destructive' })
@@ -692,32 +719,15 @@ export default function Home() {
     } catch (e) {
       toast({ title: 'Hata', description: 'Sunucu hatasi', variant: 'destructive' })
     } finally {
-      setIsRefreshing(false)
+      setTimeout(() => setIsRefreshing(false), 500)
     }
   }
 
-  // Initial data load
+  // Initial data load - sadece mevcut veriyi yukle, refresh YAPMA
   useEffect(() => {
     async function init() {
       await fetchPlatformData()
       setLoading(false)
-      // Background refresh: sayfa yuklenince arka planda verileri tazele
-      try {
-        await fetch('/api/refresh', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        })
-        const [gumroad, udemy, capafy] = await Promise.all([
-          fetch('/api/market').then(r => r.json()).catch(() => null),
-          fetch('/api/udemy').then(r => r.json()).catch(() => null),
-          fetch('/api/capafy').then(r => r.json()).catch(() => null),
-        ])
-        setPlatformData({ gumroad, udemy, capafy })
-        const ts = gumroad?.lastUpdated || udemy?.lastUpdated || capafy?.lastUpdated
-        if (ts) setLastUpdated(ts)
-        toast({ title: 'Veriler Guncellendi', description: 'Sayfa yuklendiginde otomatik guncellendi' })
-      } catch { /* background refresh failed, cached data is fine */ }
     }
     init()
   }, [])
@@ -746,6 +756,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-orange-50">
       {/* Header */}
+      <RefreshProgress isRefreshing={isRefreshing} />
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50 shrink-0">
         <div className="max-w-[1400px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">

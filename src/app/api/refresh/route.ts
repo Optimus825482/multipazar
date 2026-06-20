@@ -30,20 +30,26 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const platform = body.platform as string | undefined
 
-    let results
-    if (platform && ['gumroad', 'udemy', 'capafy'].includes(platform)) {
-      results = [await refreshPlatform(platform as 'gumroad' | 'udemy' | 'capafy')]
-    } else {
-      results = await refreshAllPlatforms()
-    }
-
-    const allSuccess = results.every(r => r.status === 'success')
-
-    return NextResponse.json({
-      status: allSuccess ? 'success' : 'partial',
-      results,
+    // Hemen cevap don - islem arka planda devam etsin
+    // Cloudflare 524 timeout'u onlemek icin
+    const response = NextResponse.json({
+      status: 'started',
+      message: 'Veri yenileme basladi. Sonuclar bir sure sonra kullanilabilir olacak.',
       timestamp: new Date().toISOString(),
     })
+
+    // Islemi arka planda baslat (fire-and-forget)
+    if (platform && ['gumroad', 'udemy', 'capafy'].includes(platform)) {
+      refreshPlatform(platform as 'gumroad' | 'udemy' | 'capafy').catch((err) =>
+        console.error('Background refresh hatasi:', err)
+      )
+    } else {
+      refreshAllPlatforms().catch((err) =>
+        console.error('Background refresh hatasi:', err)
+      )
+    }
+
+    return response
   } catch (error) {
     console.error('Refresh API error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
