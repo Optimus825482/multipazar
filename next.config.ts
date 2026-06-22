@@ -20,35 +20,38 @@ const nextConfig: NextConfig = {
           { key: "X-DNS-Prefetch-Control", value: "on" },
           // Content Security Policy
           //
-          // ONEMLI CSP syntax notlari:
-          // - blob: (tirnak YOK) -> blob URL'leri icin. 'blob' (tirnakli) GECERSIZ.
-          // - 'unsafe-inline' / 'unsafe-eval' -> Next.js inline script + dev hot reload icin gerekli.
-          // - script-src-elem explicit set edildi (CSP Level 3 fallback).
-          // - 'self' + Cloudflare Insights subdomain'i izinli.
-          //
-          // NOT: Cloudflare uzerinden gelen Cloudflare Insights beacon'u
-          // bazen 'unsafe-inline' gerektirebilir; burada acikca izin var.
+          // NOT: Sıkı CSP, Next.js ile sorun çıkarabilir. Burada pragmatik
+          // bir orta yol tutuyoruz:
+          // - script-src: Next.js inline + eval + blob + Cloudflare
+          // - connect-src: Kendi API'lerimiz + Google Analytics (Cloudflare arkasinda) + https:* (genis, proxy/fetch API'lari icin)
+          // - Tum HTTPS subdomain'lere izin veriyoruz (sadece 'self' yetmiyor;
+          //   Cloudflare Analytics, Google Fonts, vb. external kaynaklar).
           {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // script-src: 'self', inline script (Next.js), eval (Next.js dev), blob: URL'ler, Cloudflare Insights
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://static.cloudflareinsights.com",
-              // script-src-elem: yukaridaki fallback olarak (eski tarayicilar icin)
+              // script-src: Next.js inline + eval + blob URL + Cloudflare beacon
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://static.cloudflareinsights.com https://*.cloudflareinsights.com",
               "script-src-elem 'self' 'unsafe-inline' blob: https://static.cloudflareinsights.com",
               // style-src: Tailwind + inline style (component bazli)
               "style-src 'self' 'unsafe-inline'",
               "style-src-elem 'self' 'unsafe-inline'",
-              // img: logo + data URL'ler + Cloudflare Analytics resimleri
+              // img: logo + data URL'ler + herhangi bir HTTPS kaynagi (analytics vs.)
               "img-src 'self' data: blob: https:",
-              "font-src 'self' data:",
-              // connect: API scraper upstream'ler + Cloudflare Analytics
-              "connect-src 'self' https://trends.google.com https://api.capafy.ai https://gumroad.com https://static.cloudflareinsights.com https://cloudflareinsights.com",
+              "font-src 'self' data: https:",
+              // connect: API scraper upstream + Google Analytics (Cloudflare arkasinda) + tum HTTPS
+              // NOT: 'self' zaten mevcut API route'larimizi kapsar (same-origin).
+              // Google Analytics Cloudflare proxy uzerinden yuklendiginden www subdomain ekledik.
+              "connect-src 'self' https://trends.google.com https://api.capafy.ai https://gumroad.com https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com https://*.googleapis.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
               // worker: blob URL'lerden worker olusturulabilir
               "worker-src 'self' blob:",
+              // media: video/audio (gelecekte gerekli olabilir)
+              "media-src 'self' blob: https:",
+              // object/embed: Flash ve eski teknolojiler - kapat
+              "object-src 'none'",
             ].join("; "),
           },
           {
