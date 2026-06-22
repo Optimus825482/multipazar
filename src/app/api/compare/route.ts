@@ -216,95 +216,167 @@ export async function GET() {
 }
 
 function buildCrossMarketOpportunities(gumroadCats: any[], udemyCats: any[], capafyCats: any[]): any[] {
-  const opportunities: any[] = []
-
-  const getCat = (cats: any[], slug: string) => cats?.find((c: any) => c.slug === slug)
-
-  const gumroadAi = getCat(gumroadCats, 'ai-prompts')
-  const udemyAi = getCat(udemyCats, 'data-science-ai')
-  const capafyAi = getCat(capafyCats, 'prompt-engineering')
-
-  if (gumroadAi || udemyAi || capafyAi) {
-    opportunities.push({
+  const themes = [
+    {
       theme: 'AI Prompt Engineering & Tools',
-      gumroad: { category: gumroadAi?.name || 'AI Prompt Paketleri', demand: gumroadAi?.demandScore || 9.0, supply: gumroadAi?.supplyScore || 5.0, growth: gumroadAi?.growthRate || 20, avgPrice: gumroadAi?.avgPrice || 19 },
-      udemy: { category: udemyAi?.name || 'Veri Bilimi & AI/ML', demand: udemyAi?.demandScore || 9.0, supply: udemyAi?.supplyScore || 5.0, growth: udemyAi?.growthRate || 20, avgPrice: udemyAi?.avgPrice || 94 },
-      capafy: { category: capafyAi?.name || 'Prompt Muhendisligi', demand: capafyAi?.demandScore || 9.0, supply: capafyAi?.supplyScore || 3.0, growth: capafyAi?.growthRate || 30, avgPrice: capafyAi?.avgPrice || 12 },
-      recommendation: 'Capafy ve Gumroad\'da dusuk fiyatla yuksek hacim, Udemy\'de premium kurs ile yuksek gelir.',
-      bestPlatform: 'Udemy + Capafy (cift platform)',
-      potentialRevenue: '$15,000 - $50,000/ay',
-    })
-  }
-
-  const capafyAutomation = getCat(capafyCats, 'ai-automation')
-  if (capafyAutomation || gumroadAi) {
-    opportunities.push({
+      recommendedProduct: 'Prompt paketi + mini otomasyon workflow + uygulama rehberi',
+      nextAction: 'En dusuk rekabetli platformda MVP listele; ayni konuyu egitim/rehber formatina cevirerek ikinci platformda test et.',
+      categories: [
+        { platform: 'gumroad', label: 'Gumroad', cat: findCategory(gumroadCats, ['ai-prompts']) },
+        { platform: 'udemy', label: 'Udemy', cat: findCategory(udemyCats, ['data-science-ai']) },
+        { platform: 'capafy', label: 'Capafy', cat: findCategory(capafyCats, ['prompt-engineering']) },
+      ],
+    },
+    {
       theme: 'AI Otomasyon & Workflow',
-      gumroad: { category: 'Yazilim Gelistirme', demand: 8.5, supply: 4.0, growth: 20, avgPrice: 67 },
-      udemy: { category: 'IT & Sertifika', demand: 8.5, supply: 5.0, growth: 20, avgPrice: 109 },
-      capafy: { category: capafyAutomation?.name || 'AI Otomasyon', demand: capafyAutomation?.demandScore || 9.0, supply: capafyAutomation?.supplyScore || 3.0, growth: capafyAutomation?.growthRate || 30, avgPrice: capafyAutomation?.avgPrice || 29 },
-      recommendation: 'Capafy\'da otomasyon sablonlari, Gumroad\'da SaaS starter kit, Udemy\'de sertifika kursu.',
-      bestPlatform: 'Capafy (en dusuk rekabet)',
-      potentialRevenue: '$10,000 - $40,000/ay',
-    })
-  }
-
-  const capafyVideo = getCat(capafyCats, 'ai-video-generation')
-  if (capafyVideo) {
-    opportunities.push({
-      theme: 'Video Icerik & Production',
-      gumroad: { category: 'Video Production', demand: 8.0, supply: 6.0, growth: 15, avgPrice: 22 },
-      udemy: { category: 'Foto & Video', demand: 8.0, supply: 7.0, growth: 14, avgPrice: 79 },
-      capafy: { category: capafyVideo.name, demand: capafyVideo.demandScore || 8.5, supply: capafyVideo.supplyScore || 3.0, growth: capafyVideo.growthRate || 30, avgPrice: capafyVideo.avgPrice || 15 },
-      recommendation: 'Capafy\'de AI video uretim skill\'leri buyuk firsat.',
-      bestPlatform: 'Capafy (en yuksek buyume)',
-      potentialRevenue: '$8,000 - $35,000/ay',
-    })
-  }
-
-  const gumroadSoftware = getCat(gumroadCats, 'software-development')
-  const udemySoftware = getCat(udemyCats, 'software-development')
-  if (gumroadSoftware || udemySoftware) {
-    opportunities.push({
+      recommendedProduct: 'n8n/Zapier/agent otomasyon sablonu + kurulum dokumani',
+      nextAction: 'Tekrarlayan is akislarini urunlestir; once hazir template, sonra kurs veya premium kit olarak genislet.',
+      categories: [
+        { platform: 'gumroad', label: 'Gumroad', cat: findCategory(gumroadCats, ['software-development', 'ai-prompts']) },
+        { platform: 'udemy', label: 'Udemy', cat: findCategory(udemyCats, ['it-certification', 'software-development']) },
+        { platform: 'capafy', label: 'Capafy', cat: findCategory(capafyCats, ['ai-automation']) },
+      ],
+    },
+    {
       theme: 'Yazilim & Web Gelistirme',
-      gumroad: { category: gumroadSoftware?.name || 'Yazilim', demand: gumroadSoftware?.demandScore || 9.0, supply: gumroadSoftware?.supplyScore || 4.0, growth: gumroadSoftware?.growthRate || 20, avgPrice: gumroadSoftware?.avgPrice || 67 },
-      udemy: { category: udemySoftware?.name || 'Yazilim', demand: udemySoftware?.demandScore || 9.0, supply: udemySoftware?.supplyScore || 7.0, growth: udemySoftware?.growthRate || 20, avgPrice: udemySoftware?.avgPrice || 89 },
-      capafy: { category: 'AI Kod Yazma', demand: 9.5, supply: 3.0, growth: 35, avgPrice: 24 },
-      recommendation: '3 platformda da guclu talep. Gumroad\'da boilerplate, Udemy\'de bootcamp, Capafy\'da AI coding skill.',
-      bestPlatform: 'Udemy (en yuksek hacim) + Capafy (en yuksek buyume)',
-      potentialRevenue: '$20,000 - $80,000/ay',
-    })
-  }
+      recommendedProduct: 'SaaS boilerplate, starter kit, kod uretim yardimcisi veya pratik bootcamp',
+      nextAction: 'Arz yogunlugunu kontrol et; spesifik niche secip Gumroad kit + Udemy egitim hunisi kur.',
+      categories: [
+        { platform: 'gumroad', label: 'Gumroad', cat: findCategory(gumroadCats, ['software-development']) },
+        { platform: 'udemy', label: 'Udemy', cat: findCategory(udemyCats, ['software-development']) },
+        { platform: 'capafy', label: 'Capafy', cat: findCategory(capafyCats, ['ai-development']) },
+      ],
+    },
+    {
+      theme: 'AI Video / Image / Content Production',
+      recommendedProduct: 'Uretim workflow paketi, prompt presetleri, asset/template seti',
+      nextAction: 'Cikti kalitesi gosterilebilen kucuk paketle basla; talep dogrulanirsa egitim ve premium template ekle.',
+      categories: [
+        { platform: 'gumroad', label: 'Gumroad', cat: findCategory(gumroadCats, ['video-production', 'design-graphics']) },
+        { platform: 'udemy', label: 'Udemy', cat: findCategory(udemyCats, ['design', 'photography']) },
+        { platform: 'capafy', label: 'Capafy', cat: findCategory(capafyCats, ['ai-video-generation', 'ai-image-generation']) },
+      ],
+    },
+  ]
 
-  return opportunities
+  return themes
+    .map((theme) => buildRealOpportunity(theme))
+    .filter((opportunity): opportunity is NonNullable<typeof opportunity> => Boolean(opportunity))
+    .sort((a, b) => b.priorityScore - a.priorityScore)
+}
+
+function findCategory(categories: any[], slugs: string[]): any | null {
+  return slugs.map((slug) => categories.find((category) => category.slug === slug)).find(Boolean) || null
+}
+
+function toPlatformSignal(entry: { platform: string; label: string; cat: any | null }) {
+  if (!entry.cat) return null
+
+  const gapScore = Math.round(((entry.cat.demandScore || 0) - (entry.cat.supplyScore || 0)) * 10) / 10
+  const priorityScore = calculateCategoryPriority(entry.cat)
+
+  return {
+    platform: entry.platform,
+    label: entry.label,
+    category: entry.cat.name,
+    slug: entry.cat.slug,
+    demand: entry.cat.demandScore || 0,
+    supply: entry.cat.supplyScore || 0,
+    gapScore,
+    growth: entry.cat.growthRate || 0,
+    avgPrice: entry.cat.avgPrice || 0,
+    totalProducts: entry.cat.totalProducts || 0,
+    searchVolume: entry.cat.searchVolume || 0,
+    competitionIndex: entry.cat.competitionIndex || 0,
+    priorityScore,
+  }
+}
+
+type PlatformSignal = NonNullable<ReturnType<typeof toPlatformSignal>>
+
+function isPlatformSignal(signal: ReturnType<typeof toPlatformSignal>): signal is PlatformSignal {
+  return signal !== null
+}
+
+function buildRealOpportunity(theme: {
+  theme: string
+  recommendedProduct: string
+  nextAction: string
+  categories: { platform: string; label: string; cat: any | null }[]
+}) {
+  const signals = theme.categories.map(toPlatformSignal).filter(isPlatformSignal)
+
+  if (signals.length === 0) return null
+
+  const bestSignal = [...signals].sort((a, b) => b.priorityScore - a.priorityScore)[0]
+  const avgPriority = signals.reduce((sum, signal) => sum + signal.priorityScore, 0) / signals.length
+  const priorityScore = Math.round((avgPriority + bestSignal.priorityScore) / 2 * 10) / 10
+
+  return {
+    theme: theme.theme,
+    signals,
+    evidenceCount: signals.length,
+    priorityScore,
+    bestPlatform: bestSignal.label,
+    bestCategory: bestSignal.category,
+    gumroad: signals.find((signal) => signal.platform === 'gumroad') || null,
+    udemy: signals.find((signal) => signal.platform === 'udemy') || null,
+    capafy: signals.find((signal) => signal.platform === 'capafy') || null,
+    recommendedProduct: theme.recommendedProduct,
+    nextAction: theme.nextAction,
+    recommendation: `${bestSignal.label} / ${bestSignal.category}: talep ${bestSignal.demand}, arz ${bestSignal.supply}, gap ${bestSignal.gapScore}.`,
+  }
+}
+
+function calculateCategoryPriority(category: any): number {
+  const demand = category.demandScore || 0
+  const supply = category.supplyScore || 0
+  const growth = Math.max(-20, Math.min(category.growthRate || 0, 80))
+  const competition = category.competitionIndex || 10
+  const gap = Math.max(0, demand - supply)
+
+  const score =
+    demand * 0.35 +
+    gap * 0.25 +
+    ((growth + 20) / 100) * 10 * 0.2 +
+    (10 - competition) * 0.2
+
+  return Math.round(Math.max(0, Math.min(score, 10)) * 10) / 10
 }
 
 function buildPlatformStrengths(gumroadOverview: any, udemyOverview: any, capafyOverview: any): any[] {
-  const gumroadGrowth = gumroadOverview?.avgGrowthRate || 0
-  const udemyGrowth = udemyOverview?.avgGrowthRate || 0
-  const capafyGrowth = capafyOverview?.avgGrowthRate || 0
-
-  return [
+  const platformInputs = [
     {
       platform: 'Gumroad',
-      strengths: ['En dusuk komisyon (%10)', 'Yuksek fiyat esnekligi', 'Direct customer relationship', 'Digital product ecosystem'],
-      weaknesses: ['Organik trafik sinirli', 'Marketing ihtiyaci yuksek', 'Dusuk hacim'],
-      bestFor: 'Premium dijital urunler ($25-100 araligi), sablonlar, rehberler',
-      earningPotential: `$${(gumroadGrowth * 200).toLocaleString()} - $${(gumroadGrowth * 1000).toLocaleString()}/ay (tahmini)`,
+      overview: gumroadOverview,
+      strengths: ['Dusuk komisyon', 'Fiyat esnekligi', 'Musteri iliskisi dogrudan kurulabilir', 'Template/kit satmaya uygun'],
+      weaknesses: ['Organik trafik sinirli', 'Pazarlama sorumlulugu sende', 'Guven insasi gerekir'],
+      bestFor: 'Premium dijital urunler, sablonlar, rehberler, boilerplate ve asset kitleri',
     },
     {
       platform: 'Udemy',
-      strengths: ['Massive traffic (62M+ ogrenci)', 'Built-in marketing', 'Corporate training channel', 'Kurumsal B2B firsatlar'],
-      weaknesses: ['Yuksek komisyon (%63 organic)', 'Fiyat discountlara bagimli', 'Cok yuksek rekabet', 'Puanlama sistemi zor'],
-      bestFor: 'Kapsamli teknik kurslar, sertifika hazirlik, AI/ML egitimi',
-      earningPotential: `$${Math.round(udemyGrowth * 100).toLocaleString()} - $${Math.round(udemyGrowth * 500).toLocaleString()}/ay (tahmini)`,
+      overview: udemyOverview,
+      strengths: ['Hazir egitim talebi', 'Arama niyeti yuksek kullanici', 'Kurs formatinda guven olusturma'],
+      weaknesses: ['Cloudflare/scraping kisiti nedeniyle veri erisimi zor', 'Yuksek rekabet', 'Fiyatlama platform kampanyalarina bagimli'],
+      bestFor: 'Kapsamli teknik kurslar, sertifika hazirliklari, urun kitinin egitim versiyonu',
     },
     {
       platform: 'Capafy AI',
-      strengths: ['En hizli buyuyen pazar', 'Dusuk rekabet', 'AI niche odakli', 'Hizli urun olusturma'],
-      weaknesses: ['Yeni pazar (risk)', 'Kucuk musteri tabani', 'Platform olgunlugu', 'Urun cesitliligi sinirli'],
-      bestFor: 'AI skillleri, prompt paketleri, AI otomasyon sablonlari',
-      earningPotential: `$${Math.round(capafyGrowth * 150).toLocaleString()} - $${Math.round(capafyGrowth * 800).toLocaleString()}/ay (tahmini)`,
+      overview: capafyOverview,
+      strengths: ['AI niche odagi', 'Skill/agent formatina uygun', 'Hizli MVP cikarma imkani'],
+      weaknesses: ['Yeni pazar riski', 'Talep hacmi platform olgunluguna bagli', 'Kategori sinyalleri yakindan izlenmeli'],
+      bestFor: 'AI skillleri, prompt paketleri, agent workflowlari, otomasyon sablonlari',
     },
   ]
+
+  return platformInputs.map((item) => ({
+    platform: item.platform,
+    strengths: item.strengths,
+    weaknesses: item.weaknesses,
+    bestFor: item.bestFor,
+    dataStatus: item.overview?.totalCategories > 0 ? 'real-data' : 'no-current-data',
+    observedCategories: item.overview?.totalCategories || 0,
+    observedGrowthRate: item.overview?.avgGrowthRate || 0,
+    observedSearchVolume: item.overview?.totalSearchVolume || 0,
+  }))
 }
