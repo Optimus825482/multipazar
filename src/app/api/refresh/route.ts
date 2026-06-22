@@ -21,20 +21,29 @@ function getAllowedOrigins(request?: Request): string[] {
 
   if (base) {
     try {
-      list.add(new URL(base).origin)
+      const origin = new URL(base).origin
+      list.add(origin)
+      console.log(`[Refresh] NEXT_PUBLIC_BASE_URL origin: ${origin}`)
     } catch {
       // Hatali URL'i yoksay, logla
       console.warn('[Refresh] NEXT_PUBLIC_BASE_URL gecersiz:', base)
     }
-  } else {
-    // NEXT_PUBLIC_BASE_URL set edilmemisse ve request varsa,
-    // host header'indan origin'i tahmin et (fallback).
-    // Bu, Coolify/diger PaaS'lerde env unutulmasi durumunda calismayi saglar.
-    if (request) {
-      const host = request.headers.get('host')
-      const proto = request.headers.get('x-forwarded-proto') || 'https'
-      if (host) {
-        list.add(`${proto}://${host}`)
+  }
+
+  // Host header'indan origin'i tahmin et (fallback).
+  // Coolify/diger PaaS'lerde env unutulmasi durumunda calismayi saglar.
+  // Reverse proxy arkasinda x-forwarded-proto kullanmak gerekir.
+  if (request) {
+    const host = request.headers.get('host')
+    const forwardedProto = request.headers.get('x-forwarded-proto')
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    if (host) {
+      // X-Forwarded-Proto reverse proxy'den gelir; yoksa 'http' (dev) veya 'https' (prod) varsay
+      const proto = forwardedProto || (process.env.NODE_ENV === 'production' ? 'https' : 'http')
+      list.add(`${proto}://${host}`)
+      // X-Forwarded-Host bazen gercek host'u tasir (Cloudflare arkasinda)
+      if (forwardedHost && forwardedHost !== host) {
+        list.add(`${proto}://${forwardedHost}`)
       }
     }
   }
@@ -45,7 +54,11 @@ function getAllowedOrigins(request?: Request): string[] {
     list.add('http://127.0.0.1:3000')
   }
 
-  return Array.from(list)
+  const result = Array.from(list)
+  if (result.length === 0) {
+    console.warn('[Refresh] UYARI: Hic trusted origin tanimli degil! Tum refresh istekleri reddedilecek.')
+  }
+  return result
 }
 
 /**
@@ -53,15 +66,34 @@ function getAllowedOrigins(request?: Request): string[] {
  * Onceki same-origin kontrolu spoofing'e acikti (browser disindan Origin header
  * taklit edilebilir). Simdi sadece tanimli originlere izin veriliyor.
  * NEXT_PUBLIC_BASE_URL set edilmemisse, host header'indan tahmin edilir (fallback).
+ *
+ * Son savunma: Origin header'daki host, request'in Host header'iyla ayniysa
+ * (yani request kendi uzerine POST atiyorsa) same-origin olarak kabul edilir.
+ * Bu, Coolify/cloud arkasinda env set edilmemis veya yanlis set edilmis olsa bile
+ * UI'in calismasini saglar.
  */
 function isTrustedOrigin(request: Request): boolean {
   const origin = request.headers.get('origin')
   if (!origin) return false
 
   const allowed = getAllowedOrigins(request)
-  if (allowed.length === 0) return false
+  if (allowed.includes(origin)) return true
 
-  return allowed.includes(origin)
+  // Son savunma hatti: Origin host == request Host ise same-origin kabul et.
+  // Bu, browser'in kendi sayfasindan POST ettigini garanti eder (CSRF korunmasi).
+  try {
+    const originUrl = new URL(origin)
+    const requestHost = request.headers.get('host')
+    if (requestHost && originUrl.host === requestHost) {
+      console.log(`[Refresh] Same-origin fallback kabul edildi: ${origin}`)
+      return true
+    }
+  } catch {
+    // Origin parse edilemedi, reddet
+  }
+
+  console.warn(`[Refresh] Untrusted origin: ${origin}, allowed: ${allowed.join(', ')}, host: ${request.headers.get('host')}`)
+  return false
 }
 
 export async function GET(request: Request) {

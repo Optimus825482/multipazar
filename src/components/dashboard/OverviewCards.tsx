@@ -5,7 +5,7 @@ import { PLATFORM_CONFIG } from '@/lib/utils'
 
 interface OverviewCardsProps {
   data: any
-  platform: 'gumroad' | 'udemy' | 'capafy'
+  platform: 'gumroad' | 'capafy'
 }
 
 export function OverviewCards({ data, platform }: OverviewCardsProps) {

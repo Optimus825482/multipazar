@@ -11,8 +11,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "Multi-Pazar Analiz Pro | Gumroad + Udemy + Capafy AI",
-  description: "3 dijital pazaryerini karsilastirmali analiz edin. Gumroad dijital urunler, Udemy online kurslar, Capafy AI skill pazaryeri. Trendler, firsatlar ve capraz pazar stratejileri.",
+  title: "Multi-Pazar Analiz Pro | Gumroad + Capafy AI",
+  description: "2 dijital pazaryerini karsilastirmali analiz edin. Gumroad dijital urunler, Capafy AI skill pazaryeri. Trendler, firsatlar ve capraz pazar stratejileri.",
   icons: {
     icon: "/logo.png",
     shortcut: "/logo.png",

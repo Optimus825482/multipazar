@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RefreshCw, CheckCircle2, XCircle, Clock, ShoppingCart, GraduationCap, Bot, Loader2 } from 'lucide-react'
+import { RefreshCw, CheckCircle2, XCircle, Clock, ShoppingCart, Bot, Loader2 } from 'lucide-react'
 
 type PlatformStatus = 'pending' | 'loading' | 'success' | 'error'
 
@@ -16,14 +16,13 @@ interface PlatformProgress {
 
 const initialStatuses: PlatformProgress[] = [
   { id: 'gumroad', name: 'Gumroad', icon: <ShoppingCart className="w-4 h-4" />, color: '#f97316', status: 'pending' },
-  { id: 'udemy', name: 'Udemy', icon: <GraduationCap className="w-4 h-4" />, color: '#8b5cf6', status: 'pending' },
   { id: 'capafy', name: 'Capafy AI', icon: <Bot className="w-4 h-4" />, color: '#06b6d4', status: 'pending' },
 ]
 
-export function RefreshProgress({ 
-  isRefreshing, 
+export function RefreshProgress({
+  isRefreshing,
   onComplete,
-  platforms = ['gumroad', 'udemy', 'capafy']
+  platforms = ['gumroad', 'capafy']
 }: { 
   isRefreshing: boolean
   onComplete?: () => void

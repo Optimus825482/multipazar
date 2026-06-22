@@ -7,12 +7,12 @@ import { safeNum } from '@/lib/utils'
 
 interface TrendingProductsListProps {
   data: any
-  platform: 'gumroad' | 'udemy' | 'capafy'
+  platform: 'gumroad' | 'capafy'
 }
 
 export function TrendingProductsList({ data, platform }: TrendingProductsListProps) {
-  const config = platform === 'gumroad' ? { productLabel: 'Urun' } : platform === 'udemy' ? { productLabel: 'Kurs' } : { productLabel: 'Skill' }
-  const platformColor = platform === 'gumroad' ? '#f97316' : platform === 'udemy' ? '#8b5cf6' : '#06b6d4'
+  const config = platform === 'gumroad' ? { productLabel: 'Urun' } : { productLabel: 'Skill' }
+  const platformColor = platform === 'gumroad' ? '#f97316' : '#06b6d4'
 
   return (
     <Card className="border-0 shadow-md shadow-black/5">
