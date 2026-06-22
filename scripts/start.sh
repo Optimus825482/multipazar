@@ -3,12 +3,22 @@ set +e
 
 export DATABASE_URL="${DATABASE_URL:-file:/data/mulpaz.db}"
 
-if [ -d "/app/prisma/migrations" ]; then
+# Prisma CLI'yi proje node_modules/.bin uzerinden bul.
+# Bu, network'e bagimliligi kaldirir ve build zamaninda belirlenen
+# versiyonun kullanilmasini garanti eder.
+PRISMA_BIN="./node_modules/.bin/prisma"
+
+if [ ! -x "$PRISMA_BIN" ]; then
+  echo "[Startup] HATA: $PRISMA_BIN bulunamadi. Image build hatasi olabilir."
+  exit 1
+fi
+
+if [ -d "/app/prisma/migrations" ] && [ -n "$(ls -A /app/prisma/migrations 2>/dev/null | grep -v migration_lock.toml)" ]; then
   echo "[Startup] Prisma migrate deploy calistiriliyor..."
-  bunx prisma@6.11.1 migrate deploy 2>&1
+  $PRISMA_BIN migrate deploy 2>&1
 else
   echo "[Startup] Prisma migrations bulunamadi; guvenli db push fallback calistiriliyor..."
-  bunx prisma@6.11.1 db push 2>&1
+  $PRISMA_BIN db push --skip-generate 2>&1
 fi
 
 echo "[Startup] Next.js uygulamasi baslatiliyor..."
