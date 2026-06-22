@@ -113,7 +113,17 @@ export async function GET() {
     setCached('market-data-db', result, CACHE_DURATION)
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Market API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('[Market API] Detayli hata:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    })
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        detail: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
   }
 }

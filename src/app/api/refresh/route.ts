@@ -14,9 +14,8 @@ function isAllowedPlatform(value: unknown): value is AllowedPlatform {
   return typeof value === 'string' && (ALLOWED_PLATFORMS as readonly string[]).includes(value)
 }
 
-function getAllowedOrigins(): string[] {
+function getAllowedOrigins(request?: Request): string[] {
   // NEXT_PUBLIC_BASE_URL (ornek: http://localhost:3000, https://market.erkanerdem.online)
-  // + localhost varyasyonlari (gelistirme)
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim()
   const list = new Set<string>()
 
@@ -26,6 +25,17 @@ function getAllowedOrigins(): string[] {
     } catch {
       // Hatali URL'i yoksay, logla
       console.warn('[Refresh] NEXT_PUBLIC_BASE_URL gecersiz:', base)
+    }
+  } else {
+    // NEXT_PUBLIC_BASE_URL set edilmemisse ve request varsa,
+    // host header'indan origin'i tahmin et (fallback).
+    // Bu, Coolify/diger PaaS'lerde env unutulmasi durumunda calismayi saglar.
+    if (request) {
+      const host = request.headers.get('host')
+      const proto = request.headers.get('x-forwarded-proto') || 'https'
+      if (host) {
+        list.add(`${proto}://${host}`)
+      }
     }
   }
 
@@ -42,12 +52,13 @@ function getAllowedOrigins(): string[] {
  * GUVENLIK: Origin header allowlist ile dogrulama.
  * Onceki same-origin kontrolu spoofing'e acikti (browser disindan Origin header
  * taklit edilebilir). Simdi sadece tanimli originlere izin veriliyor.
+ * NEXT_PUBLIC_BASE_URL set edilmemisse, host header'indan tahmin edilir (fallback).
  */
 function isTrustedOrigin(request: Request): boolean {
   const origin = request.headers.get('origin')
   if (!origin) return false
 
-  const allowed = getAllowedOrigins()
+  const allowed = getAllowedOrigins(request)
   if (allowed.length === 0) return false
 
   return allowed.includes(origin)

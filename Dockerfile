@@ -30,6 +30,10 @@ RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appu
 
 WORKDIR /app
 
+# SQLite DB volume mount noktasi. appuser yazabilsin.
+# Coolify named volume mount'unda sahiplik sorunlarini onler.
+RUN mkdir -p /data && chown -R appuser:appgroup /data
+
 # Build'den standalone ciktiyi kopyala (.next/static + public zaten icinde)
 COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
 
