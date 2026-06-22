@@ -13,4 +13,7 @@ services:
       - PORT=3000
       - DATABASE_URL=file:./mulpaz.db
       - NEXT_PUBLIC_BASE_URL=https://market.erkanerdem.online
-      - CRON_SECRET=mulpaz-cron-secret-2026
+      # GUVENLIK: Secret host ortam degiskeninden veya .env dosyasindan okunur.
+      # Asla buraya acik metin yazmayin. Host'ta `export CRON_SECRET=...` veya
+      # docker-compose ile ayni dizindeki .env dosyasini kullanin.
+      - CRON_SECRET=${CRON_SECRET:?CRON_SECRET ortam degiskeni set edilmeli}

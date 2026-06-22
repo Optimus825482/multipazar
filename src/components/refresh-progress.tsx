@@ -14,6 +14,12 @@ interface PlatformProgress {
   status: PlatformStatus
 }
 
+const initialStatuses: PlatformProgress[] = [
+  { id: 'gumroad', name: 'Gumroad', icon: <ShoppingCart className="w-4 h-4" />, color: '#f97316', status: 'pending' },
+  { id: 'udemy', name: 'Udemy', icon: <GraduationCap className="w-4 h-4" />, color: '#8b5cf6', status: 'pending' },
+  { id: 'capafy', name: 'Capafy AI', icon: <Bot className="w-4 h-4" />, color: '#06b6d4', status: 'pending' },
+]
+
 export function RefreshProgress({ 
   isRefreshing, 
   onComplete,
@@ -23,21 +29,17 @@ export function RefreshProgress({
   onComplete?: () => void
   platforms?: string[]
 }) {
-  const [progress, setProgress] = useState(0)
-  const [statuses, setStatuses] = useState<PlatformProgress[]>([
-    { id: 'gumroad', name: 'Gumroad', icon: <ShoppingCart className="w-4 h-4" />, color: '#f97316', status: 'pending' },
-    { id: 'udemy', name: 'Udemy', icon: <GraduationCap className="w-4 h-4" />, color: '#8b5cf6', status: 'pending' },
-    { id: 'capafy', name: 'Capafy AI', icon: <Bot className="w-4 h-4" />, color: '#06b6d4', status: 'pending' },
-  ])
-  const [currentStep, setCurrentStep] = useState(0)
-  const [visible, setVisible] = useState(false)
+  const [progress, setProgress] = useState(() => isRefreshing ? 0 : 100)
+  const [statuses, setStatuses] = useState<PlatformProgress[]>(initialStatuses)
+  const [visible, setVisible] = useState(() => isRefreshing)
 
   useEffect(() => {
     if (isRefreshing) {
-      setVisible(true)
-      setProgress(0)
-      setStatuses(prev => prev.map(s => ({ ...s, status: 'pending' as PlatformStatus })))
-      setCurrentStep(0)
+      const startTimer = setTimeout(() => {
+        setVisible(true)
+        setProgress(0)
+        setStatuses(initialStatuses)
+      }, 0)
 
       // Simule et: her platform sirayla yukleniyor
       // Gercek progres API'den donen sonuclara gore guncellenecek
@@ -48,20 +50,27 @@ export function RefreshProgress({
         })
       }, 300)
 
-      return () => clearInterval(interval)
+      return () => {
+        clearTimeout(startTimer)
+        clearInterval(interval)
+      }
     } else {
-      // Tamamlandi
-      setProgress(100)
-      setStatuses(prev => prev.map(s => 
-        s.status === 'loading' ? { ...s, status: 'success' as PlatformStatus } : s
-      ))
+      const completeTimer = setTimeout(() => {
+        setProgress(100)
+        setStatuses(prev => prev.map(s =>
+          s.status === 'loading' ? { ...s, status: 'success' as PlatformStatus } : s
+        ))
+      }, 0)
 
       const timer = setTimeout(() => {
         setVisible(false)
         onComplete?.()
       }, 1500)
 
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(completeTimer)
+        clearTimeout(timer)
+      }
     }
   }, [isRefreshing, onComplete])
 

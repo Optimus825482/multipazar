@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getPlatformDataFromDB } from '@/data/helpers'
 
 const cache = new Map<string, { data: unknown; timestamp: number }>()
 const CACHE_DURATION = 15 * 60 * 1000
@@ -19,117 +20,168 @@ export async function GET() {
     const cached = getCached('compare-data-v2')
     if (cached) return NextResponse.json(cached)
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-
-    const [gumroadRes, udemyRes, capafyRes] = await Promise.all([
-      fetch(`${baseUrl}/api/market`).then(r => r.json()).catch(() => null),
-      fetch(`${baseUrl}/api/udemy`).then(r => r.json()).catch(() => null),
-      fetch(`${baseUrl}/api/capafy`).then(r => r.json()).catch(() => null),
+    // DOGRUDAN veri katmanindan cek - kendine HTTP istegi atmak yerine
+    // Bu, gereksiz ag/serilestirme maliyetini onler ve BASE_URL yanlisligina karsi dayaniklidir.
+    const [gumroadData, udemyData, capafyData] = await Promise.all([
+      getPlatformDataFromDB('gumroad').catch(() => null),
+      getPlatformDataFromDB('udemy').catch(() => null),
+      getPlatformDataFromDB('capafy').catch(() => null),
     ])
 
-    if (!gumroadRes && !udemyRes && !capafyRes) {
-      return NextResponse.json({ error: 'All marketplace APIs failed' }, { status: 500 })
+    if (!gumroadData && !udemyData && !capafyData) {
+      return NextResponse.json({ error: 'All marketplace data unavailable' }, { status: 500 })
     }
 
-    // Cross-platform comparison data (real data from APIs)
+    // Ham DB verilerini isle
+    const gumroadCats = gumroadData?.categories ?? []
+    const udemyCats = udemyData?.categories ?? []
+    const capafyCats = capafyData?.categories ?? []
+
+    const gumroadOverview = gumroadData ? {
+      totalRevenue: (gumroadCats as any[]).reduce((s: number, c: any) => s + (c.totalRevenue || 0), 0),
+      totalProducts: (gumroadCats as any[]).reduce((s: number, c: any) => s + (c.totalProducts || 0), 0),
+      totalSearchVolume: (gumroadCats as any[]).reduce((s: number, c: any) => s + (c.searchVolume || 0), 0),
+      avgGrowthRate: gumroadCats.length > 0
+        ? (gumroadCats as any[]).reduce((s: number, c: any) => s + (c.growthRate || 0), 0) / gumroadCats.length
+        : 0,
+      totalCategories: gumroadCats.length,
+    } : null
+
+    const udemyOverview = udemyData ? {
+      totalRevenue: (udemyCats as any[]).reduce((s: number, c: any) => s + (c.totalRevenue || 0), 0),
+      totalCourses: (udemyCats as any[]).reduce((s: number, c: any) => s + (c.totalProducts || 0), 0),
+      totalSearchVolume: (udemyCats as any[]).reduce((s: number, c: any) => s + (c.searchVolume || 0), 0),
+      avgGrowthRate: udemyCats.length > 0
+        ? (udemyCats as any[]).reduce((s: number, c: any) => s + (c.growthRate || 0), 0) / udemyCats.length
+        : 0,
+      totalCategories: udemyCats.length,
+      avgPrice: udemyCats.length > 0
+        ? Math.round((udemyCats as any[]).reduce((s: number, c: any) => s + (c.avgPrice || 0), 0) / udemyCats.length)
+        : 0,
+    } : null
+
+    const capafyOverview = capafyData ? {
+      totalRevenue: (capafyCats as any[]).reduce((s: number, c: any) => s + (c.totalRevenue || 0), 0),
+      totalProducts: (capafyCats as any[]).reduce((s: number, c: any) => s + (c.totalProducts || 0), 0),
+      totalSearchVolume: (capafyCats as any[]).reduce((s: number, c: any) => s + (c.searchVolume || 0), 0),
+      avgGrowthRate: capafyCats.length > 0
+        ? (capafyCats as any[]).reduce((s: number, c: any) => s + (c.growthRate || 0), 0) / capafyCats.length
+        : 0,
+      totalCategories: capafyCats.length,
+      avgPrice: capafyCats.length > 0
+        ? Math.round((capafyCats as any[]).reduce((s: number, c: any) => s + (c.avgPrice || 0), 0) / capafyCats.length)
+        : 0,
+    } : null
+
+    // Cross-platform comparison
     const platforms = [
       {
         name: 'Gumroad',
         color: '#f97316',
         icon: 'ShoppingCart',
         type: 'Dijital Urun Pazaryeri',
-        overview: gumroadRes?.overview ? {
-          totalRevenue: gumroadRes.overview.totalRevenue,
-          totalProducts: gumroadRes.overview.totalProducts,
-          totalSearchVolume: gumroadRes.overview.totalSearchVolume,
-          avgGrowthRate: gumroadRes.overview.avgGrowthRate,
-          totalCategories: gumroadRes.overview.totalCategories,
-        } : null,
-        avgPrice: gumroadRes?.categories ? Math.round(gumroadRes.categories.reduce((s: number, c: any) => s + c.avgPrice, 0) / gumroadRes.categories.length) : 0,
+        overview: gumroadOverview,
+        avgPrice: gumroadCats.length > 0
+          ? Math.round((gumroadCats as any[]).reduce((s: number, c: any) => s + (c.avgPrice || 0), 0) / gumroadCats.length)
+          : 0,
         commissionRate: 10,
-        topGrowthCategory: gumroadRes?.categories ? [...gumroadRes.categories].sort((a: any, b: any) => b.growthRate - a.growthRate)[0] : null,
-        lowestCompetition: gumroadRes?.categories ? [...gumroadRes.categories].sort((a: any, b: any) => a.competitionIndex - b.competitionIndex)[0] : null,
-        bestOpportunity: gumroadRes?.categories ? [...gumroadRes.categories].sort((a: any, b: any) => (b.demandScore - b.supplyScore) - (a.demandScore - a.supplyScore))[0] : null,
+        topGrowthCategory: [...(gumroadCats as any[])].sort((a, b) => (b.growthRate || 0) - (a.growthRate || 0))[0] || null,
+        lowestCompetition: [...(gumroadCats as any[])].sort((a, b) => (a.competitionIndex || 0) - (b.competitionIndex || 0))[0] || null,
+        bestOpportunity: [...(gumroadCats as any[])].sort(
+          (a, b) => ((b.demandScore || 0) - (b.supplyScore || 0)) - ((a.demandScore || 0) - (a.supplyScore || 0))
+        )[0] || null,
       },
       {
         name: 'Udemy',
         color: '#8b5cf6',
         icon: 'GraduationCap',
         type: 'Online Kurs Platformu',
-        overview: udemyRes?.overview ? {
-          totalRevenue: udemyRes.overview.totalRevenue,
-          totalProducts: udemyRes.overview.totalCourses,
-          totalSearchVolume: udemyRes.overview.totalSearchVolume,
-          avgGrowthRate: udemyRes.overview.avgGrowthRate,
-          totalCategories: udemyRes.overview.totalCategories,
-          avgPrice: udemyRes.overview.avgPrice,
-        } : null,
-        avgPrice: udemyRes?.overview?.avgPrice || 0,
+        overview: udemyOverview,
+        avgPrice: udemyCats.length > 0
+          ? Math.round((udemyCats as any[]).reduce((s: number, c: any) => s + (c.avgPrice || 0), 0) / udemyCats.length)
+          : 0,
         commissionRate: 63,
-        topGrowthCategory: udemyRes?.categories ? [...udemyRes.categories].sort((a: any, b: any) => b.growthRate - a.growthRate)[0] : null,
-        lowestCompetition: udemyRes?.categories ? [...udemyRes.categories].sort((a: any, b: any) => a.competitionIndex - b.competitionIndex)[0] : null,
-        bestOpportunity: udemyRes?.categories ? [...udemyRes.categories].sort((a: any, b: any) => (b.demandScore - b.supplyScore) - (a.demandScore - a.supplyScore))[0] : null,
+        topGrowthCategory: [...(udemyCats as any[])].sort((a, b) => (b.growthRate || 0) - (a.growthRate || 0))[0] || null,
+        lowestCompetition: [...(udemyCats as any[])].sort((a, b) => (a.competitionIndex || 0) - (b.competitionIndex || 0))[0] || null,
+        bestOpportunity: [...(udemyCats as any[])].sort(
+          (a, b) => ((b.demandScore || 0) - (b.supplyScore || 0)) - ((a.demandScore || 0) - (a.supplyScore || 0))
+        )[0] || null,
       },
       {
         name: 'Capafy AI',
         color: '#06b6d4',
         icon: 'Bot',
         type: 'AI Skill Pazaryeri',
-        overview: capafyRes?.overview ? {
-          totalRevenue: capafyRes.overview.totalRevenue,
-          totalProducts: capafyRes.overview.totalProducts,
-          totalSearchVolume: capafyRes.overview.totalSearchVolume,
-          avgGrowthRate: capafyRes.overview.avgGrowthRate,
-          totalCategories: capafyRes.overview.totalCategories,
-          avgPrice: capafyRes.overview.avgPrice,
-        } : null,
-        avgPrice: capafyRes?.overview?.avgPrice || 0,
+        overview: capafyOverview,
+        avgPrice: capafyCats.length > 0
+          ? Math.round((capafyCats as any[]).reduce((s: number, c: any) => s + (c.avgPrice || 0), 0) / capafyCats.length)
+          : 0,
         commissionRate: 20,
-        topGrowthCategory: capafyRes?.categories ? [...capafyRes.categories].sort((a: any, b: any) => b.growthRate - a.growthRate)[0] : null,
-        lowestCompetition: capafyRes?.categories ? [...capafyRes.categories].sort((a: any, b: any) => a.competitionIndex - b.competitionIndex)[0] : null,
-        bestOpportunity: capafyRes?.categories ? [...capafyRes.categories].sort((a: any, b: any) => (b.demandScore - b.supplyScore) - (a.demandScore - a.supplyScore))[0] : null,
+        topGrowthCategory: [...(capafyCats as any[])].sort((a, b) => (b.growthRate || 0) - (a.growthRate || 0))[0] || null,
+        lowestCompetition: [...(capafyCats as any[])].sort((a, b) => (a.competitionIndex || 0) - (b.competitionIndex || 0))[0] || null,
+        bestOpportunity: [...(capafyCats as any[])].sort(
+          (a, b) => ((b.demandScore || 0) - (b.supplyScore || 0)) - ((a.demandScore || 0) - (a.supplyScore || 0))
+        )[0] || null,
       },
     ]
 
-    // Cross-market opportunity themes (calculated from real API data)
-    const crossMarketOpportunities = buildCrossMarketOpportunities(gumroadRes, udemyRes, capafyRes)
+    // Comparison metrics berechnung
+    const gumroadDemandAvg = gumroadCats.length > 0
+      ? Math.round((gumroadCats as any[]).reduce((s: number, c: any) => s + (c.demandScore || 0), 0) / gumroadCats.length * 10) / 10
+      : 0
+    const udemyDemandAvg = udemyCats.length > 0
+      ? Math.round((udemyCats as any[]).reduce((s: number, c: any) => s + (c.demandScore || 0), 0) / udemyCats.length * 10) / 10
+      : 0
+    const capafyDemandAvg = capafyCats.length > 0
+      ? Math.round((capafyCats as any[]).reduce((s: number, c: any) => s + (c.demandScore || 0), 0) / capafyCats.length * 10) / 10
+      : 0
 
-    // Platform comparison metrics (real data)
+    const gumroadCompAvg = gumroadCats.length > 0
+      ? Math.round((gumroadCats as any[]).reduce((s: number, c: any) => s + (c.competitionIndex || 0), 0) / gumroadCats.length * 10) / 10
+      : 0
+    const udemyCompAvg = udemyCats.length > 0
+      ? Math.round((udemyCats as any[]).reduce((s: number, c: any) => s + (c.competitionIndex || 0), 0) / udemyCats.length * 10) / 10
+      : 0
+    const capafyCompAvg = capafyCats.length > 0
+      ? Math.round((capafyCats as any[]).reduce((s: number, c: any) => s + (c.competitionIndex || 0), 0) / capafyCats.length * 10) / 10
+      : 0
+
+    function getBestPlatform(v1?: number, v2?: number, v3?: number): string {
+      const a = v1 || 0; const b = v2 || 0; const c = v3 || 0
+      if (a >= b && a >= c) return 'gumroad'
+      if (b >= a && b >= c) return 'udemy'
+      return 'capafy'
+    }
+
     const comparisonMetrics = [
       {
         metric: 'Ort. Buyume Orani',
-        gumroad: gumroadRes?.overview?.avgGrowthRate || 0,
-        udemy: udemyRes?.overview?.avgGrowthRate || 0,
-        capafy: capafyRes?.overview?.avgGrowthRate || 0,
-        best: getBestPlatform(gumroadRes?.overview?.avgGrowthRate, udemyRes?.overview?.avgGrowthRate, capafyRes?.overview?.avgGrowthRate),
+        gumroad: gumroadOverview?.avgGrowthRate || 0,
+        udemy: udemyOverview?.avgGrowthRate || 0,
+        capafy: capafyOverview?.avgGrowthRate || 0,
+        best: getBestPlatform(gumroadOverview?.avgGrowthRate, udemyOverview?.avgGrowthRate, capafyOverview?.avgGrowthRate),
       },
       {
         metric: 'Ort. Talep Skoru',
-        gumroad: gumroadRes?.categories ? Math.round(gumroadRes.categories.reduce((s: number, c: any) => s + c.demandScore, 0) / gumroadRes.categories.length * 10) / 10 : 0,
-        udemy: udemyRes?.categories ? Math.round(udemyRes.categories.reduce((s: number, c: any) => s + c.demandScore, 0) / udemyRes.categories.length * 10) / 10 : 0,
-        capafy: capafyRes?.categories ? Math.round(capafyRes.categories.reduce((s: number, c: any) => s + c.demandScore, 0) / capafyRes.categories.length * 10) / 10 : 0,
-        best: getBestPlatform(
-          gumroadRes?.categories?.reduce((s: number, c: any) => s + c.demandScore, 0) / (gumroadRes?.categories?.length || 1),
-          udemyRes?.categories?.reduce((s: number, c: any) => s + c.demandScore, 0) / (udemyRes?.categories?.length || 1),
-          capafyRes?.categories?.reduce((s: number, c: any) => s + c.demandScore, 0) / (capafyRes?.categories?.length || 1)
-        ),
+        gumroad: gumroadDemandAvg,
+        udemy: udemyDemandAvg,
+        capafy: capafyDemandAvg,
+        best: getBestPlatform(gumroadDemandAvg, udemyDemandAvg, capafyDemandAvg),
       },
       {
         metric: 'Ort. Rekabet (dusuk = iyi)',
-        gumroad: gumroadRes?.categories ? Math.round(gumroadRes.categories.reduce((s: number, c: any) => s + c.competitionIndex, 0) / gumroadRes.categories.length * 10) / 10 : 0,
-        udemy: udemyRes?.categories ? Math.round(udemyRes.categories.reduce((s: number, c: any) => s + c.competitionIndex, 0) / udemyRes.categories.length * 10) / 10 : 0,
-        capafy: capafyRes?.categories ? Math.round(capafyRes.categories.reduce((s: number, c: any) => s + c.competitionIndex, 0) / capafyRes.categories.length * 10) / 10 : 0,
-        best: getBestPlatform(
-          -(gumroadRes?.categories?.reduce((s: number, c: any) => s + c.competitionIndex, 0) || 0),
-          -(udemyRes?.categories?.reduce((s: number, c: any) => s + c.competitionIndex, 0) || 0),
-          -(capafyRes?.categories?.reduce((s: number, c: any) => s + c.competitionIndex, 0) || 0)
-        ),
+        gumroad: gumroadCompAvg,
+        udemy: udemyCompAvg,
+        capafy: capafyCompAvg,
+        best: getBestPlatform(-gumroadCompAvg, -udemyCompAvg, -capafyCompAvg),
       },
       {
         metric: 'Ort. Fiyat',
-        gumroad: gumroadRes?.categories ? Math.round(gumroadRes.categories.reduce((s: number, c: any) => s + c.avgPrice, 0) / gumroadRes.categories.length) : 0,
-        udemy: udemyRes?.overview?.avgPrice || 0,
-        capafy: capafyRes?.overview?.avgPrice || 0,
+        gumroad: gumroadCats.length > 0
+          ? Math.round((gumroadCats as any[]).reduce((s: number, c: any) => s + (c.avgPrice || 0), 0) / gumroadCats.length)
+          : 0,
+        udemy: udemyOverview?.avgPrice || 0,
+        capafy: capafyOverview?.avgPrice || 0,
         best: 'udemy',
       },
       {
@@ -141,8 +193,11 @@ export async function GET() {
       },
     ]
 
-    // Platform strength analysis (based on real data)
-    const platformStrengths = buildPlatformStrengths(gumroadRes, udemyRes, capafyRes)
+    // Cross-market opportunities
+    const crossMarketOpportunities = buildCrossMarketOpportunities(gumroadCats, udemyCats, capafyCats)
+
+    // Platform strengths
+    const platformStrengths = buildPlatformStrengths(gumroadOverview, udemyOverview, capafyOverview)
 
     const result = {
       platforms,
@@ -160,85 +215,74 @@ export async function GET() {
   }
 }
 
-function getBestPlatform(val1?: number, val2?: number, val3?: number): string {
-  const v1 = val1 || 0
-  const v2 = val2 || 0
-  const v3 = val3 || 0
-  if (v1 >= v2 && v1 >= v3) return 'gumroad'
-  if (v2 >= v1 && v2 >= v3) return 'udemy'
-  return 'capafy'
-}
-
-function buildCrossMarketOpportunities(gumroadRes: any, udemyRes: any, capafyRes: any): any[] {
+function buildCrossMarketOpportunities(gumroadCats: any[], udemyCats: any[], capafyCats: any[]): any[] {
   const opportunities: any[] = []
 
-  // AI Prompt Engineering
-  const gumroadAi = gumroadRes?.categories?.find((c: any) => c.slug === 'ai-prompts')
-  const udemyAi = udemyRes?.categories?.find((c: any) => c.slug === 'data-science-ai')
-  const capafyAi = capafyRes?.categories?.find((c: any) => c.slug === 'prompt-engineering')
+  const getCat = (cats: any[], slug: string) => cats?.find((c: any) => c.slug === slug)
+
+  const gumroadAi = getCat(gumroadCats, 'ai-prompts')
+  const udemyAi = getCat(udemyCats, 'data-science-ai')
+  const capafyAi = getCat(capafyCats, 'prompt-engineering')
 
   if (gumroadAi || udemyAi || capafyAi) {
     opportunities.push({
-      theme: "AI Prompt Engineering & Tools",
-      gumroad: { category: gumroadAi?.name || "AI Prompt Paketleri", demand: gumroadAi?.demandScore || 9.0, supply: gumroadAi?.supplyScore || 3.0, growth: gumroadAi?.growthRate || 20, avgPrice: gumroadAi?.avgPrice || 19 },
-      udemy: { category: udemyAi?.name || "Veri Bilimi & AI/ML", demand: udemyAi?.demandScore || 9.0, supply: udemyAi?.supplyScore || 5.0, growth: udemyAi?.growthRate || 20, avgPrice: udemyAi?.avgPrice || 94 },
-      capafy: { category: capafyAi?.name || "AI Prompt Muhendisligi", demand: capafyAi?.demandScore || 9.0, supply: capafyAi?.supplyScore || 3.0, growth: capafyAi?.growthRate || 30, avgPrice: capafyAi?.avgPrice || 12 },
-      recommendation: "Capafy ve Gumroad'da dusuk fiyatla yuksek hacim, Udemy'de premium kurs ile yuksek gelir.",
-      bestPlatform: "Udemy + Capafy (cift platform)",
-      potentialRevenue: "$15,000 - $50,000/ay",
+      theme: 'AI Prompt Engineering & Tools',
+      gumroad: { category: gumroadAi?.name || 'AI Prompt Paketleri', demand: gumroadAi?.demandScore || 9.0, supply: gumroadAi?.supplyScore || 5.0, growth: gumroadAi?.growthRate || 20, avgPrice: gumroadAi?.avgPrice || 19 },
+      udemy: { category: udemyAi?.name || 'Veri Bilimi & AI/ML', demand: udemyAi?.demandScore || 9.0, supply: udemyAi?.supplyScore || 5.0, growth: udemyAi?.growthRate || 20, avgPrice: udemyAi?.avgPrice || 94 },
+      capafy: { category: capafyAi?.name || 'Prompt Muhendisligi', demand: capafyAi?.demandScore || 9.0, supply: capafyAi?.supplyScore || 3.0, growth: capafyAi?.growthRate || 30, avgPrice: capafyAi?.avgPrice || 12 },
+      recommendation: 'Capafy ve Gumroad\'da dusuk fiyatla yuksek hacim, Udemy\'de premium kurs ile yuksek gelir.',
+      bestPlatform: 'Udemy + Capafy (cift platform)',
+      potentialRevenue: '$15,000 - $50,000/ay',
     })
   }
 
-  // AI Automation
-  const capafyAutomation = capafyRes?.categories?.find((c: any) => c.slug === 'ai-automation')
+  const capafyAutomation = getCat(capafyCats, 'ai-automation')
   if (capafyAutomation || gumroadAi) {
     opportunities.push({
-      theme: "AI Otomasyon & Workflow",
-      gumroad: { category: "Yazilim Gelistirme", demand: gumroadAi?.demandScore || 8.5, supply: gumroadAi?.supplyScore || 4.0, growth: gumroadAi?.growthRate || 20, avgPrice: 67 },
-      udemy: { category: "IT & Sertifika", demand: udemyAi?.demandScore || 8.5, supply: udemyAi?.supplyScore || 5.0, growth: udemyAi?.growthRate || 20, avgPrice: 109 },
-      capafy: { category: capafyAutomation?.name || "AI Otomasyon", demand: capafyAutomation?.demandScore || 9.0, supply: capafyAutomation?.supplyScore || 3.0, growth: capafyAutomation?.growthRate || 30, avgPrice: capafyAutomation?.avgPrice || 29 },
-      recommendation: "Capafy'da otomasyon sablonlari, Gumroad'da SaaS starter kit, Udemy'de sertifika kursu.",
-      bestPlatform: "Capafy (en dusuk rekabet)",
-      potentialRevenue: "$10,000 - $40,000/ay",
+      theme: 'AI Otomasyon & Workflow',
+      gumroad: { category: 'Yazilim Gelistirme', demand: 8.5, supply: 4.0, growth: 20, avgPrice: 67 },
+      udemy: { category: 'IT & Sertifika', demand: 8.5, supply: 5.0, growth: 20, avgPrice: 109 },
+      capafy: { category: capafyAutomation?.name || 'AI Otomasyon', demand: capafyAutomation?.demandScore || 9.0, supply: capafyAutomation?.supplyScore || 3.0, growth: capafyAutomation?.growthRate || 30, avgPrice: capafyAutomation?.avgPrice || 29 },
+      recommendation: 'Capafy\'da otomasyon sablonlari, Gumroad\'da SaaS starter kit, Udemy\'de sertifika kursu.',
+      bestPlatform: 'Capafy (en dusuk rekabet)',
+      potentialRevenue: '$10,000 - $40,000/ay',
     })
   }
 
-  // Video/AI Video
-  const capafyVideo = capafyRes?.categories?.find((c: any) => c.slug === 'ai-video-generation')
+  const capafyVideo = getCat(capafyCats, 'ai-video-generation')
   if (capafyVideo) {
     opportunities.push({
-      theme: "Video Icerik & Production",
-      gumroad: { category: "Video Production", demand: 8.0, supply: 6.0, growth: 15, avgPrice: 22 },
-      udemy: { category: "Foto & Video", demand: 8.0, supply: 7.0, growth: 14, avgPrice: 79 },
-      capafy: { category: capafyVideo.name, demand: capafyVideo.demandScore, supply: capafyVideo.supplyScore, growth: capafyVideo.growthRate, avgPrice: capafyVideo.avgPrice },
-      recommendation: "Capafy'de AI video uretim skill'leri buyuk firsat.",
-      bestPlatform: "Capafy (en yuksek buyume)",
-      potentialRevenue: "$8,000 - $35,000/ay",
+      theme: 'Video Icerik & Production',
+      gumroad: { category: 'Video Production', demand: 8.0, supply: 6.0, growth: 15, avgPrice: 22 },
+      udemy: { category: 'Foto & Video', demand: 8.0, supply: 7.0, growth: 14, avgPrice: 79 },
+      capafy: { category: capafyVideo.name, demand: capafyVideo.demandScore || 8.5, supply: capafyVideo.supplyScore || 3.0, growth: capafyVideo.growthRate || 30, avgPrice: capafyVideo.avgPrice || 15 },
+      recommendation: 'Capafy\'de AI video uretim skill\'leri buyuk firsat.',
+      bestPlatform: 'Capafy (en yuksek buyume)',
+      potentialRevenue: '$8,000 - $35,000/ay',
     })
   }
 
-  // Software Development
-  const gumroadSoftware = gumroadRes?.categories?.find((c: any) => c.slug === 'software-development')
-  const udemySoftware = udemyRes?.categories?.find((c: any) => c.slug === 'software-development')
+  const gumroadSoftware = getCat(gumroadCats, 'software-development')
+  const udemySoftware = getCat(udemyCats, 'software-development')
   if (gumroadSoftware || udemySoftware) {
     opportunities.push({
-      theme: "Yazilim & Web Gelistirme",
-      gumroad: { category: gumroadSoftware?.name || "Yazilim", demand: gumroadSoftware?.demandScore || 9.0, supply: gumroadSoftware?.supplyScore || 4.0, growth: gumroadSoftware?.growthRate || 20, avgPrice: gumroadSoftware?.avgPrice || 67 },
-      udemy: { category: udemySoftware?.name || "Yazilim", demand: udemySoftware?.demandScore || 9.0, supply: udemySoftware?.supplyScore || 7.0, growth: udemySoftware?.growthRate || 20, avgPrice: udemySoftware?.avgPrice || 89 },
-      capafy: { category: "AI Kod Yazma", demand: 9.5, supply: 3.0, growth: 35, avgPrice: 24 },
-      recommendation: "3 platformda da guclu talep. Gumroad'da boilerplate, Udemy'de bootcamp, Capafy'da AI coding skill.",
-      bestPlatform: "Udemy (en yuksek hacim) + Capafy (en yuksek buyume)",
-      potentialRevenue: "$20,000 - $80,000/ay",
+      theme: 'Yazilim & Web Gelistirme',
+      gumroad: { category: gumroadSoftware?.name || 'Yazilim', demand: gumroadSoftware?.demandScore || 9.0, supply: gumroadSoftware?.supplyScore || 4.0, growth: gumroadSoftware?.growthRate || 20, avgPrice: gumroadSoftware?.avgPrice || 67 },
+      udemy: { category: udemySoftware?.name || 'Yazilim', demand: udemySoftware?.demandScore || 9.0, supply: udemySoftware?.supplyScore || 7.0, growth: udemySoftware?.growthRate || 20, avgPrice: udemySoftware?.avgPrice || 89 },
+      capafy: { category: 'AI Kod Yazma', demand: 9.5, supply: 3.0, growth: 35, avgPrice: 24 },
+      recommendation: '3 platformda da guclu talep. Gumroad\'da boilerplate, Udemy\'de bootcamp, Capafy\'da AI coding skill.',
+      bestPlatform: 'Udemy (en yuksek hacim) + Capafy (en yuksek buyume)',
+      potentialRevenue: '$20,000 - $80,000/ay',
     })
   }
 
   return opportunities
 }
 
-function buildPlatformStrengths(gumroadRes: any, udemyRes: any, capafyRes: any): any[] {
-  const gumroadGrowth = gumroadRes?.overview?.avgGrowthRate || 0
-  const udemyGrowth = udemyRes?.overview?.avgGrowthRate || 0
-  const capafyGrowth = capafyRes?.overview?.avgGrowthRate || 0
+function buildPlatformStrengths(gumroadOverview: any, udemyOverview: any, capafyOverview: any): any[] {
+  const gumroadGrowth = gumroadOverview?.avgGrowthRate || 0
+  const udemyGrowth = udemyOverview?.avgGrowthRate || 0
+  const capafyGrowth = capafyOverview?.avgGrowthRate || 0
 
   return [
     {

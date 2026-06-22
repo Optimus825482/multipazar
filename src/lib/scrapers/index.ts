@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { fetchKeywordTrends, fetchMultipleTrends, getSearchTermsForCategory, TrendResult } from './trends'
+import { fetchMultipleTrends, getSearchTermsForCategory, TrendResult } from './trends'
 import { fetchAllUdemyCategories, UdemyCategoryData } from './udemy'
 import { fetchAllCapafyCategories, CapafyCategoryData } from './capafy'
 import { fetchAllGumroadCategories, GumroadCategoryData } from './gumroad'
@@ -8,10 +8,7 @@ import {
   calculateSupplyScore,
   calculateCompetitionIndex,
   calculateOpportunityScore,
-  calculateGrowthFromTrendData,
-  estimateGrowthRate,
   determineTrendDirection,
-  calculateUnmetDemand,
   CategoryStats,
 } from './scoring'
 
@@ -66,416 +63,365 @@ const PLATFORM_CATEGORIES: Record<Platform, { name: string; slug: string; descri
 }
 
 /**
- * Google Trends verisi ile SearchTrend kayitlarini olusturur
+ * Platform kaynak etiketi (DB source alaninda gosterilir)
  */
-async function saveTrendData(platform: Platform, trendResults: Map<string, TrendResult>) {
-  for (const [keyword, trend] of trendResults) {
-    for (const point of trend.data) {
-      await db.searchTrend.create({
+const PLATFORM_SOURCE: Record<Platform, string> = {
+  gumroad: 'Gumroad Inertia API + Google Trends',
+  udemy: 'Udemy Scraping + Google Trends',
+  capafy: 'Capafy Scraping + Google Trends',
+}
+
+/**
+ * Veri kaynagi tipi - hangi scraper ile urun/kurs cekildigini soyutlar.
+ */
+interface CategoryScrapedData {
+  slug: string
+  totalProducts: number
+  avgPrice: number
+  avgRating: number
+  avgReviews: number
+  totalStudents?: number
+  products: ScrapedProduct[]
+}
+
+interface ScrapedProduct {
+  name: string
+  price: number
+  rating: number
+  reviewCount: number
+  salesCount: number
+  studentCount?: number
+  tags: string
+  isTrending: boolean
+  seller?: string
+  instructor?: string
+  creator?: string
+  url?: string
+  avgMonthlySales?: number
+  avgMonthlyEnroll?: number
+  demandScore?: number
+  supplyScore?: number
+}
+
+/**
+ * Platforma ozel scraper cagirisini soyutlar.
+ */
+async function fetchPlatformCategories(platform: Platform, slugs: string[]): Promise<Map<string, CategoryScrapedData>> {
+  const results = new Map<string, CategoryScrapedData>()
+
+  if (platform === 'gumroad') {
+    const data = await fetchAllGumroadCategories(slugs)
+    for (const [, cat] of data) {
+      results.set(cat.slug, {
+        slug: cat.slug,
+        totalProducts: cat.totalProducts,
+        avgPrice: cat.avgPrice,
+        avgRating: cat.avgRating,
+        avgReviews: cat.avgReviews,
+        products: cat.products.map((p) => ({
+          name: p.name,
+          price: p.price,
+          rating: p.rating,
+          reviewCount: p.reviewCount,
+          salesCount: p.salesCount,
+          tags: p.tags,
+          isTrending: p.rating >= 4.5,
+          seller: p.seller,
+          url: p.url,
+          avgMonthlySales: p.avgMonthlySales,
+          demandScore: p.demandScore,
+          supplyScore: p.supplyScore,
+        })),
+      })
+    }
+  } else if (platform === 'udemy') {
+    const data = await fetchAllUdemyCategories(slugs)
+    for (const [, cat] of data) {
+      results.set(cat.slug, {
+        slug: cat.slug,
+        totalProducts: cat.totalCourses,
+        avgPrice: cat.avgPrice,
+        avgRating: cat.avgRating,
+        avgReviews: cat.avgReviews,
+        products: cat.courses.map((c) => ({
+          name: c.name,
+          price: c.price,
+          rating: c.rating,
+          reviewCount: c.reviewCount,
+          salesCount: c.studentCount,
+          studentCount: c.studentCount,
+          tags: c.tags,
+          isTrending: c.isTrending,
+          instructor: c.instructor,
+          url: c.url,
+          avgMonthlyEnroll: c.avgMonthlyEnroll,
+          demandScore: c.demandScore,
+          supplyScore: c.supplyScore,
+        })),
+      })
+    }
+  } else {
+    const data = await fetchAllCapafyCategories(slugs)
+    for (const [, cat] of data) {
+      results.set(cat.slug, {
+        slug: cat.slug,
+        totalProducts: cat.totalProducts,
+        avgPrice: cat.avgPrice,
+        avgRating: cat.avgRating,
+        avgReviews: cat.avgReviews,
+        products: cat.products.map((p) => ({
+          name: p.name,
+          price: p.price,
+          rating: p.rating,
+          reviewCount: p.reviewCount,
+          salesCount: p.salesCount,
+          tags: p.tags,
+          isTrending: p.isTrending,
+          creator: p.creator,
+          url: p.url,
+          avgMonthlySales: p.avgMonthlySales,
+          demandScore: p.demandScore,
+          supplyScore: p.supplyScore,
+        })),
+      })
+    }
+  }
+
+  return results
+}
+
+/**
+ * Platforma ozel default degerler - uydurma degil, makul minimum varsayimlar.
+ * Gercek veri olmadiginda kategori ATLANIR, uydurma veri uretilmez.
+ */
+function getProductType(platform: Platform): string {
+  return platform === 'udemy' ? 'course' : 'other'
+}
+
+function getPriceRange(price: number): string {
+  if (price > 50) return 'premium'
+  if (price > 20) return 'mid'
+  return 'budget'
+}
+
+/**
+ * Tek bir platformu guvenli sekilde yeniler (atomik transaction ile).
+ *
+ * VERI BUTUNLUGU:
+ * - Eski veriler silinir ve yenisi TEK transaction icinde yazilir.
+ * - Hata olursa transaction rollback olur -> eski veri kaybolmaz.
+ * - createMany ile toplu insert (N+1 sorgu onlenir).
+ *
+ * VERI GUVENILIRLIGI:
+ * - Scraping basarisiz olursa uydurulmus fallback deger KULLANILMAZ.
+ *   Eger ne scrapelenmis urun ne de trend verisi yoksa kategori atlanir.
+ */
+async function refreshPlatformData(platform: Platform): Promise<void> {
+  const categories = PLATFORM_CATEGORIES[platform]
+
+  // 1. Dis kaynaklardan veri cek (scraping + trends)
+  const allSearchTerms = categories.flatMap((cat) => getSearchTermsForCategory(cat.slug, platform))
+  const trendResults = await fetchMultipleTrends(allSearchTerms)
+  const scrapedData = await fetchPlatformCategories(platform, categories.map((c) => c.slug))
+
+  // 2. Kategori istatistiklerini hesapla - sadece GERCEK veri olanlar
+  const validCategories: typeof categories = []
+  const allCategoryStats: CategoryStats[] = []
+  const categoryGrowthRates: number[] = []
+
+  for (const cat of categories) {
+    const scraped = scrapedData.get(cat.slug)
+    const searchTerms = getSearchTermsForCategory(cat.slug, platform)
+    const trend = trendResults.get(searchTerms[0])
+
+    const hasProductData = scraped && scraped.totalProducts > 0
+    const hasTrendData = trend && trend.avgVolume > 0
+
+    // VERI BUTUNLUGU: Ne urun ne trend verisi yoksa bu kategoriyi ATLA.
+    // Uydurulmus fallback (|| 100, || 35 vb.) uretme.
+    if (!hasProductData && !hasTrendData) {
+      console.warn(`[${platform}] "${cat.slug}" icin veri yok, kategori atlaniyor`)
+      continue
+    }
+
+    validCategories.push(cat)
+
+    const totalProducts = scraped?.totalProducts ?? 0
+    const avgPrice = scraped?.avgPrice ?? 0
+    const avgRating = scraped?.avgRating ?? 0
+    const avgReviews = scraped?.avgReviews ?? 0
+    const searchVolume = trend?.avgVolume ?? 0
+    const growthRate = trend?.growthRate ?? 0
+    const totalStudents = scraped?.totalStudents ?? (platform === 'udemy' ? totalProducts * 500 : 0)
+
+    // Gelir hesabi: GERCEK urun verisi varsa urun fiyat * satis uzerinden.
+    // Uydurma carpan (*30, *50) KALDIRILDI.
+    let totalRevenue = 0
+    if (scraped && scraped.products.length > 0) {
+      totalRevenue = scraped.products.reduce((sum, p) => sum + p.price * p.salesCount, 0)
+    }
+
+    allCategoryStats.push({
+      avgPrice,
+      totalProducts,
+      totalRevenue,
+      searchVolume,
+      avgRating,
+      avgReviews,
+      totalStudents,
+    })
+    categoryGrowthRates.push(growthRate)
+  }
+
+  // Hic gecerli kategori yoksa veritabanini bos birakma - eski veriyi koru
+  if (validCategories.length === 0) {
+    console.warn(`[${platform}] Hic gecerli veri yok, refresh iptal edildi (eski veri korundu)`)
+    return
+  }
+
+  // 3. Atomik transaction: sil + yeniden yaz. Hata olursa eski veri korunsun.
+  await db.$transaction(async (tx) => {
+    // Eski verileri sil
+    await tx.productIdea.deleteMany({ where: { platform } })
+    await tx.searchTrend.deleteMany({ where: { platform } })
+    await tx.marketInsight.deleteMany({ where: { platform } })
+    await tx.product.deleteMany({ where: { platform } })
+    await tx.category.deleteMany({ where: { platform } })
+
+    // Kategorileri olustur ve id'leri topla
+    const categorySlugToId: Record<string, string> = {}
+
+    for (let i = 0; i < validCategories.length; i++) {
+      const cat = validCategories[i]
+      if (!cat) continue
+      const stats = allCategoryStats[i]
+      if (!stats) continue
+      const growthRate = categoryGrowthRates[i] ?? 0
+      const demandScore = calculateDemandScore(stats, allCategoryStats)
+      const supplyScore = calculateSupplyScore(stats, allCategoryStats)
+
+      const created = await tx.category.create({
         data: {
+          platform,
+          name: cat.name,
+          slug: cat.slug,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          avgPrice: stats.avgPrice,
+          totalProducts: stats.totalProducts,
+          totalRevenue: stats.totalRevenue,
+          totalStudents: stats.totalStudents || null,
+          searchVolume: stats.searchVolume,
+          demandScore,
+          supplyScore,
+          competitionIndex: calculateCompetitionIndex(demandScore, supplyScore),
+          growthRate,
+          trendDirection: determineTrendDirection(growthRate),
+          avgRating: stats.avgRating || null,
+          avgReviews: stats.avgReviews || null,
+          source: PLATFORM_SOURCE[platform],
+        },
+      })
+      categorySlugToId[cat.slug] = created.id
+    }
+
+    // Urunleri createMany ile toplu yaz (N+1 onlenir)
+    const productType = getProductType(platform)
+    const productsToCreate: Array<Record<string, unknown>> = []
+
+    for (const cat of validCategories) {
+      const scraped = scrapedData.get(cat.slug)
+      const categoryId = categorySlugToId[cat.slug]
+      if (!scraped || !categoryId) continue
+
+      for (const product of scraped.products) {
+        const demandScore = product.demandScore ?? 5
+        const supplyScore = product.supplyScore ?? 5
+        productsToCreate.push({
+          platform,
+          name: product.name,
+          categoryId,
+          price: product.price,
+          salesCount: product.salesCount,
+          studentCount: product.studentCount ?? null,
+          revenue: Math.round(product.price * product.salesCount),
+          rating: product.rating,
+          reviewCount: product.reviewCount,
+          demandScore,
+          supplyScore,
+          opportunityScore: calculateOpportunityScore(demandScore, supplyScore),
+          tags: product.tags,
+          type: productType,
+          avgMonthlySales: product.avgMonthlySales ?? null,
+          avgMonthlyEnroll: product.avgMonthlyEnroll ?? null,
+          priceRange: getPriceRange(product.price),
+          isTrending: product.isTrending,
+          instructor: product.instructor ?? null,
+          creator: product.creator ?? null,
+          url: product.url ?? null,
+        })
+      }
+    }
+
+    // createMany ile tek sorguda toplu insert
+    if (productsToCreate.length > 0) {
+      await tx.product.createMany({ data: productsToCreate as never })
+    }
+
+    // Trend verisini kaydet
+    const trendsToCreate: Array<Record<string, unknown>> = []
+    for (const [keyword, trend] of trendResults) {
+      for (const point of trend.data) {
+        trendsToCreate.push({
           platform,
           keyword: trend.keyword,
           categorySlug: keyword,
           month: point.month,
           volume: point.volume,
           growthRate: trend.growthRate,
-        },
-      }).catch(() => {
-        // Unique constraint varsa atla (ayni keyword+month zaten var)
+        })
+      }
+    }
+    if (trendsToCreate.length > 0) {
+      await tx.searchTrend.createMany({
+        data: trendsToCreate as never,
       })
     }
-  }
-}
 
-/**
- * Gumroad verilerini Gumroad Inertia JSON API + Google Trends ile yeniler
- * X-Inertia header'i sayesinde direkt JSON doner (Puppeteer gerekmez)
- */
-async function refreshGumroad() {
-  const platform: Platform = 'gumroad'
-  const categories = PLATFORM_CATEGORIES.gumroad
-
-  // Tum eski verileri temizle
-  await db.$transaction([
-    db.productIdea.deleteMany({ where: { platform } }),
-    db.searchTrend.deleteMany({ where: { platform } }),
-    db.marketInsight.deleteMany({ where: { platform } }),
-    db.product.deleteMany({ where: { platform } }),
-    db.category.deleteMany({ where: { platform } }),
-  ])
-
-  // Google Trends verilerini cek
-  const allSearchTerms = categories.flatMap((cat) => getSearchTermsForCategory(cat.slug, 'gumroad'))
-  const trendResults = await fetchMultipleTrends(allSearchTerms)
-
-  // Gumroad Inertia API ile gercek urun verilerini cek
-  const gumroadSlugs = categories.map((c) => c.slug)
-  const gumroadData = await fetchAllGumroadCategories(gumroadSlugs)
-
-  // Kategorileri olustur
-  const categorySlugToId: Record<string, string> = {}
-  const allCategoryStats: CategoryStats[] = []
-  const categoryGrowthRates: Record<string, number> = {}
-
-  for (const cat of categories) {
-    const scraped = gumroadData.get(cat.slug)
-    const trend = trendResults.get(getSearchTermsForCategory(cat.slug, 'gumroad')[0])
-
-    const totalProducts = scraped?.totalProducts || 100
-    const avgPrice = scraped?.avgPrice || 35
-    const avgRating = scraped?.avgRating || 4.3
-    const avgReviews = scraped?.avgReviews || 50
-    const searchVolume = trend?.avgVolume || 15000
-    const growthRate = trend?.growthRate || 15
-
-    categoryGrowthRates[cat.slug] = growthRate
-
-    allCategoryStats.push({
-      avgPrice,
-      totalProducts,
-      totalRevenue: totalProducts * avgPrice * 30,
-      searchVolume,
-      avgRating,
-      avgReviews,
-      totalStudents: 0,
-    })
-  }
-
-  for (let i = 0; i < categories.length; i++) {
-    const cat = categories[i]
-    const stats = allCategoryStats[i]
-    const growthRate = categoryGrowthRates[cat.slug] || 15
-    const demandScore = calculateDemandScore(stats, allCategoryStats)
-    const supplyScore = calculateSupplyScore(stats, allCategoryStats)
-
-    const created = await db.category.create({
-      data: {
-        platform,
-        name: cat.name,
-        slug: cat.slug,
-        description: cat.description,
-        icon: cat.icon,
-        color: cat.color,
-        avgPrice: stats.avgPrice,
-        totalProducts: stats.totalProducts,
-        totalRevenue: stats.totalRevenue,
-        searchVolume: stats.searchVolume,
-        demandScore,
-        supplyScore,
-        competitionIndex: calculateCompetitionIndex(demandScore, supplyScore),
-        growthRate,
-        trendDirection: determineTrendDirection(growthRate),
-        source: 'Gumroad Inertia API + Google Trends',
-      },
-    })
-    categorySlugToId[cat.slug] = created.id
-  }
-
-  // Gumroad API'den gelen urunleri kaydet
-  for (const [, catData] of gumroadData) {
-    const categoryId = categorySlugToId[catData.slug]
-    if (!categoryId) continue
-
-    for (const product of catData.products) {
-      await db.product.create({
-        data: {
-          platform,
-          name: product.name,
-          categoryId,
-          price: product.price,
-          salesCount: product.reviewCount,
-          revenue: Math.round(product.price * product.reviewCount),
-          rating: product.rating,
-          reviewCount: product.reviewCount,
-          demandScore: product.demandScore || 5,
-          supplyScore: product.supplyScore || 5,
-          opportunityScore: calculateOpportunityScore(product.demandScore || 5, product.supplyScore || 5),
-          tags: product.tags,
-          type: 'other',
-          avgMonthlySales: product.avgMonthlySales || 0,
-          priceRange: product.price > 50 ? 'premium' : product.price > 20 ? 'mid' : 'budget',
-          isTrending: product.rating >= 4.5,
-          instructor: product.seller,
-          url: product.url,
-        },
-      }).catch((err) => console.error(`[Gumroad] Urun kaydetme hatasi: ${product.name}`, err.message))
+    // Insight'lari olustur
+    const insightsToCreate = buildInsights(platform, allCategoryStats, trendResults)
+    if (insightsToCreate.length > 0) {
+      await tx.marketInsight.createMany({ data: insightsToCreate as never })
     }
-  }
-
-  // Trend verisini kaydet
-  await saveTrendData(platform, trendResults)
-
-  // Insightlari olustur
-  await generateInsights(platform, allCategoryStats, trendResults)
+  })
 }
 
 /**
- * Udemy verilerini Google Trends + Udemy scraping ile yeniler
+ * Gercek verilere gore insight (icgoru) olusturur.
  */
-async function refreshUdemy() {
-  const platform: Platform = 'udemy'
-  const categories = PLATFORM_CATEGORIES.udemy
-
-  // Eski verileri temizle
-  await db.$transaction([
-    db.productIdea.deleteMany({ where: { platform } }),
-    db.searchTrend.deleteMany({ where: { platform } }),
-    db.marketInsight.deleteMany({ where: { platform } }),
-    db.product.deleteMany({ where: { platform } }),
-    db.category.deleteMany({ where: { platform } }),
-  ])
-
-  // Google Trends verilerini cek
-  const allSearchTerms = categories.flatMap((cat) => getSearchTermsForCategory(cat.slug, 'udemy'))
-  const trendResults = await fetchMultipleTrends(allSearchTerms)
-
-  // Udemy scraping ile gercek kurs verilerini cek
-  const udemySlugs = categories.map((c) => c.slug)
-  const udemyData = await fetchAllUdemyCategories(udemySlugs)
-
-  // Kategorileri olustur
-  const categorySlugToId: Record<string, string> = {}
-  const allCategoryStats: CategoryStats[] = []
-  const categoryGrowthRates: Record<string, number> = {}
-
-  for (const cat of categories) {
-    const scraped = udemyData.get(cat.slug)
-    const trend = trendResults.get(getSearchTermsForCategory(cat.slug, 'udemy')[0])
-
-    const totalCourses = scraped?.totalCourses || 500
-    const avgPrice = scraped?.avgPrice || 70
-    const avgRating = scraped?.avgRating || 4.3
-    const avgReviews = scraped?.avgReviews || 500
-    const searchVolume = trend?.avgVolume || 500000
-    const growthRate = trend?.growthRate || 15
-
-    categoryGrowthRates[cat.slug] = growthRate
-
-    allCategoryStats.push({
-      avgPrice,
-      totalProducts: totalCourses,
-      totalRevenue: totalCourses * avgPrice,
-      searchVolume,
-      avgRating,
-      avgReviews,
-      totalStudents: totalCourses * 500,
-    })
-  }
-
-  for (let i = 0; i < categories.length; i++) {
-    const cat = categories[i]
-    const stats = allCategoryStats[i]
-    const growthRate = categoryGrowthRates[cat.slug] || 15
-    const demandScore = calculateDemandScore(stats, allCategoryStats)
-    const supplyScore = calculateSupplyScore(stats, allCategoryStats)
-
-    const created = await db.category.create({
-      data: {
-        platform,
-        name: cat.name,
-        slug: cat.slug,
-        description: cat.description,
-        icon: cat.icon,
-        color: cat.color,
-        avgPrice: stats.avgPrice,
-        totalProducts: stats.totalProducts,
-        totalRevenue: stats.totalRevenue,
-        totalStudents: stats.totalStudents,
-        searchVolume: stats.searchVolume,
-        demandScore,
-        supplyScore,
-        competitionIndex: calculateCompetitionIndex(demandScore, supplyScore),
-        growthRate,
-        trendDirection: determineTrendDirection(growthRate),
-        avgRating: stats.avgRating,
-        avgReviews: stats.avgReviews,
-        source: 'Udemy Scraping + Google Trends',
-      },
-    })
-    categorySlugToId[cat.slug] = created.id
-  }
-
-  // Udemy scraping'den gelen kurslari kaydet
-  for (const [, catData] of udemyData) {
-    const categoryId = categorySlugToId[catData.slug]
-    if (!categoryId) continue
-
-    for (const course of catData.courses) {
-      await db.product.create({
-        data: {
-          platform,
-          name: course.name,
-          categoryId,
-          price: course.price,
-          studentCount: course.studentCount,
-          salesCount: course.studentCount,
-          revenue: Math.round(course.price * course.studentCount * 0.15),
-          rating: course.rating,
-          reviewCount: course.reviewCount,
-          demandScore: course.demandScore || 5,
-          supplyScore: course.supplyScore || 5,
-          opportunityScore: calculateOpportunityScore(course.demandScore || 5, course.supplyScore || 5),
-          tags: course.tags,
-          type: 'course',
-          avgMonthlyEnroll: course.avgMonthlyEnroll || 0,
-          priceRange: course.price > 70 ? 'premium' : course.price > 30 ? 'mid' : 'budget',
-          isTrending: course.isTrending,
-          instructor: course.instructor,
-          url: course.url,
-        },
-      }).catch((err) => console.error(`[Udemy] Kurs kaydetme hatasi: ${course.name}`, err.message))
-    }
-  }
-
-  // Trend verisini kaydet
-  await saveTrendData(platform, trendResults)
-
-  // Insightlari olustur
-  await generateInsights(platform, allCategoryStats, trendResults)
-}
-
-/**
- * Capafy verilerini Google Trends + Capafy scraping ile yeniler
- */
-async function refreshCapafy() {
-  const platform: Platform = 'capafy'
-  const categories = PLATFORM_CATEGORIES.capafy
-
-  // Eski verileri temizle
-  await db.$transaction([
-    db.productIdea.deleteMany({ where: { platform } }),
-    db.searchTrend.deleteMany({ where: { platform } }),
-    db.marketInsight.deleteMany({ where: { platform } }),
-    db.product.deleteMany({ where: { platform } }),
-    db.category.deleteMany({ where: { platform } }),
-  ])
-
-  // Google Trends verilerini cek
-  const allSearchTerms = categories.flatMap((cat) => getSearchTermsForCategory(cat.slug, 'capafy'))
-  const trendResults = await fetchMultipleTrends(allSearchTerms)
-
-  // Capafy scraping ile gercek urun verilerini cek
-  const capafySlugs = categories.map((c) => c.slug)
-  const capafyData = await fetchAllCapafyCategories(capafySlugs)
-
-  // Kategorileri olustur
-  const categorySlugToId: Record<string, string> = {}
-  const allCategoryStats: CategoryStats[] = []
-  const categoryGrowthRates: Record<string, number> = {}
-
-  for (const cat of categories) {
-    const scraped = capafyData.get(cat.slug)
-    const trend = trendResults.get(getSearchTermsForCategory(cat.slug, 'capafy')[0])
-
-    const totalProducts = scraped?.totalProducts || 100
-    const avgPrice = scraped?.avgPrice || 30
-    const avgRating = scraped?.avgRating || 4.5
-    const avgReviews = scraped?.avgReviews || 50
-    const searchVolume = trend?.avgVolume || 30000
-    const growthRate = trend?.growthRate || 25
-
-    categoryGrowthRates[cat.slug] = growthRate
-
-    allCategoryStats.push({
-      avgPrice,
-      totalProducts,
-      totalRevenue: totalProducts * avgPrice * 50,
-      searchVolume,
-      avgRating,
-      avgReviews,
-      totalStudents: 0,
-    })
-  }
-
-  for (let i = 0; i < categories.length; i++) {
-    const cat = categories[i]
-    const stats = allCategoryStats[i]
-    const growthRate = categoryGrowthRates[cat.slug] || 25
-    const demandScore = calculateDemandScore(stats, allCategoryStats)
-    const supplyScore = calculateSupplyScore(stats, allCategoryStats)
-
-    const created = await db.category.create({
-      data: {
-        platform,
-        name: cat.name,
-        slug: cat.slug,
-        description: cat.description,
-        icon: cat.icon,
-        color: cat.color,
-        avgPrice: stats.avgPrice,
-        totalProducts: stats.totalProducts,
-        totalRevenue: stats.totalRevenue,
-        searchVolume: stats.searchVolume,
-        demandScore,
-        supplyScore,
-        competitionIndex: calculateCompetitionIndex(demandScore, supplyScore),
-        growthRate,
-        trendDirection: determineTrendDirection(growthRate),
-        avgRating: stats.avgRating,
-        avgReviews: stats.avgReviews,
-        source: 'Capafy Scraping + Google Trends',
-      },
-    })
-    categorySlugToId[cat.slug] = created.id
-  }
-
-  // Capafy scraping'den gelen urunleri kaydet
-  for (const [, catData] of capafyData) {
-    const categoryId = categorySlugToId[catData.slug]
-    if (!categoryId) continue
-
-    for (const product of catData.products) {
-      await db.product.create({
-        data: {
-          platform,
-          name: product.name,
-          categoryId,
-          price: product.price,
-          salesCount: product.salesCount,
-          revenue: Math.round(product.price * product.salesCount),
-          rating: product.rating,
-          reviewCount: product.reviewCount,
-          demandScore: product.demandScore || 5,
-          supplyScore: product.supplyScore || 5,
-          opportunityScore: calculateOpportunityScore(product.demandScore || 5, product.supplyScore || 5),
-          tags: product.tags,
-          type: 'other',
-          avgMonthlySales: product.avgMonthlySales || 0,
-          priceRange: product.price > 50 ? 'premium' : product.price > 20 ? 'mid' : 'budget',
-          isTrending: product.isTrending,
-          creator: product.creator,
-          url: product.url,
-        },
-      }).catch((err) => console.error(`[Capafy] Urun kaydetme hatasi: ${product.name}`, err.message))
-    }
-  }
-
-  // Trend verisini kaydet
-  await saveTrendData(platform, trendResults)
-
-  // Insightlari olustur
-  await generateInsights(platform, allCategoryStats, trendResults)
-}
-
-/**
- * Gercek verilere gore insight (icgoru) olusturur
- */
-async function generateInsights(
+function buildInsights(
   platform: Platform,
   allStats: CategoryStats[],
   trendResults: Map<string, TrendResult>
-) {
-  const insights: { title: string; description: string; insightType: string; impactScore: number; source: string }[] = []
+): Array<Record<string, unknown>> {
+  const insights: Array<Record<string, unknown>> = []
 
-  // En hizli buyuyen kategori
-  const sortedByGrowth = [...allStats].sort((a, b) => b.searchVolume - a.searchVolume)
-  if (sortedByGrowth.length > 0) {
-    const top = sortedByGrowth[0]
+  // Bos veri korumasi
+  if (allStats.length === 0) return insights
+
+  // En yuksek talep kategorisi
+  const sortedByVolume = [...allStats].sort((a, b) => b.searchVolume - a.searchVolume)
+  const top = sortedByVolume[0]
+  if (top && top.searchVolume > 0) {
+    const second = sortedByVolume[1]
+    const ratio = second && second.searchVolume > 0 ? top.searchVolume / second.searchVolume : 1
     insights.push({
+      platform,
       title: `${platform === 'udemy' ? 'Kurs' : 'Urun'} Talebi En Yuksek Kategori`,
-      description: `Toplam ${top.searchVolume.toLocaleString()} aylik arama hacmi ile en cok talep goren kategori. Google Trends verilerine gore bu kategorideki talep diger kategorilere gore %${Math.round((top.searchVolume / (sortedByGrowth[1]?.searchVolume || 1) - 1) * 100)} daha yuksek.`,
+      description: `Toplam ${top.searchVolume.toLocaleString()} aylik arama hacmi ile en cok talep goren kategori. Bu kategorideki talep digerlerinden %${Math.round((ratio - 1) * 100)} daha yuksek.`,
       insightType: 'opportunity',
-      impactScore: Math.round((top.searchVolume / sortedByGrowth[0].searchVolume) * 10 * 10) / 10,
+      impactScore: Math.min(10, Math.round(ratio * 5 * 10) / 10),
       source: 'Google Trends + Platform Verileri',
     })
   }
@@ -484,7 +430,8 @@ async function generateInsights(
   for (const [keyword, trend] of trendResults) {
     if (trend.growthRate > 30) {
       insights.push({
-        title: `"${keyword}" Arama Hacmi ${trend.growthRate}% Buyuyor`,
+        platform,
+        title: `"${keyword}" Arama Hacmi %${trend.growthRate} Buyuyor`,
         description: `Son 12 ayda "${keyword}" aramalari %${trend.growthRate} artis gosterdi. En yuksek hacim ${trend.peakMonth} tarihinde olculdu. Bu trend devam ederse onumuzdeki 6 ayda talep daha da artacak.`,
         insightType: 'opportunity',
         impactScore: Math.min(trend.growthRate / 10, 10),
@@ -492,7 +439,8 @@ async function generateInsights(
       })
     } else if (trend.growthRate < -10) {
       insights.push({
-        title: `"${keyword}" Talebi Dususte -${Math.abs(trend.growthRate)}%`,
+        platform,
+        title: `"${keyword}" Talebi Dususte -%${Math.abs(trend.growthRate)}`,
         description: `Son 12 ayda "${keyword}" aramalari %${Math.abs(trend.growthRate)} azaldi. Bu kategoride yeni urun cikarmak icin dogru zaman olmayabilir.`,
         insightType: 'warning',
         impactScore: Math.min(Math.abs(trend.growthRate) / 10, 8),
@@ -501,11 +449,12 @@ async function generateInsights(
     }
   }
 
-  // Doymus pazar uyarisi
+  // Doymus pazar / dusuk rekabet uyari ve firsatlari
   for (const stats of allStats) {
     const supplyScore = calculateSupplyScore(stats, allStats)
     if (supplyScore > 7.5) {
       insights.push({
+        platform,
         title: 'Yuksek Rekabet Uyarisi',
         description: `${stats.totalProducts.toLocaleString()} adet urun ile bu kategori dogmus durumda. Yeni girenler icin farklilastirma sart.`,
         insightType: 'warning',
@@ -514,6 +463,7 @@ async function generateInsights(
       })
     } else if (supplyScore < 3.0) {
       insights.push({
+        platform,
         title: 'Dusuk Rekabet - Buyuk Firsat',
         description: `Rekabetin cok dusuk oldugu bu kategoride ilk hamle avantaji var. Az sayida urun var ama talep yuksek.`,
         insightType: 'opportunity',
@@ -523,21 +473,7 @@ async function generateInsights(
     }
   }
 
-  // Insightlari kaydet
-  for (const insight of insights) {
-    try {
-      await db.marketInsight.create({
-        data: {
-          platform,
-          title: insight.title,
-          description: insight.description,
-          insightType: insight.insightType,
-          impactScore: insight.impactScore,
-          source: insight.source,
-        },
-      })
-    } catch {}
-  }
+  return insights
 }
 
 /**
@@ -546,11 +482,7 @@ async function generateInsights(
 export async function refreshPlatform(platform: Platform): Promise<{ platform: Platform; status: 'success' | 'error'; duration: number; message: string }> {
   const start = Date.now()
   try {
-    switch (platform) {
-      case 'gumroad': await refreshGumroad(); break
-      case 'udemy': await refreshUdemy(); break
-      case 'capafy': await refreshCapafy(); break
-    }
+    await refreshPlatformData(platform)
 
     await db.refreshLog.create({
       data: {
@@ -587,7 +519,11 @@ export async function refreshPlatform(platform: Platform): Promise<{ platform: P
 }
 
 /**
- * Tum platformlari yeniler
+ * Tum platformlari yeniler.
+ *
+ * ONEM: Platformlar SIRAYLA (ardisik) calisir, paralel DEGIL.
+ * SQLite tek yazici destekler; paralel yazma SQLITE_BUSY kilitlenmesine yol acar.
+ * WAL modu (db.ts) es zamanli okuma/yazmaya izin verse de yazma hala serilestirilmeli.
  */
 export async function refreshAllPlatforms(): Promise<{ platform: Platform; status: 'success' | 'error'; duration: number; message: string }[]> {
   // In-memory cache temizle
@@ -596,11 +532,11 @@ export async function refreshAllPlatforms(): Promise<{ platform: Platform; statu
     globalCache.refreshCache.clear()
   }
 
-  const results = await Promise.all([
-    refreshPlatform('gumroad'),
-    refreshPlatform('udemy'),
-    refreshPlatform('capafy'),
-  ])
+  // ADR: Platformlar SIRAYLA calisir (paralel degil) - SQLite yazma kilidini onlemek icin
+  const results: { platform: Platform; status: 'success' | 'error'; duration: number; message: string }[] = []
+  for (const platform of ['gumroad', 'udemy', 'capafy'] as Platform[]) {
+    results.push(await refreshPlatform(platform))
+  }
 
   const allSuccess = results.every((r) => r.status === 'success')
   await db.refreshLog.create({
@@ -616,3 +552,6 @@ export async function refreshAllPlatforms(): Promise<{ platform: Platform; statu
 
   return results
 }
+
+// Geriye donuk uyumluluk: eski importlari kiran tip export'lari
+export type { GumroadCategoryData, UdemyCategoryData, CapafyCategoryData, TrendResult }

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, RadarChart, PolarGrid,
@@ -192,39 +192,34 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
   const config = PLATFORM_CONFIG[platform]
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [sortBy, setSortBy] = useState('revenue')
-  const [products, setProducts] = useState<Product[]>([])
   const [innerTab, setInnerTab] = useState('dashboard')
 
-  useEffect(() => {
-    if (data?.products) {
-      setProducts(data.products)
-    }
-  }, [data])
+  const products = useMemo(() => {
+    const sourceProducts = data?.products || []
+    const filtered = selectedCategory === 'all'
+      ? sourceProducts
+      : sourceProducts.filter((p: Product) => {
+        const pCatSlug = p.category?.slug || ''
+        return pCatSlug === selectedCategory || p.tags?.toLowerCase().includes(selectedCategory.replace(/-/g, ' '))
+      })
+
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'revenue': return (b.revenue || 0) - (a.revenue || 0)
+        case 'sales': return (b.salesCount || b.studentCount || 0) - (a.salesCount || a.studentCount || 0)
+        case 'demand': return b.demandScore - a.demandScore
+        case 'opportunity': return (b.opportunityScore || 0) - (a.opportunityScore || 0)
+        default: return (b.revenue || 0) - (a.revenue || 0)
+      }
+    })
+  }, [data?.products, selectedCategory, sortBy])
 
   function handleCategoryChange(cat: string) {
     setSelectedCategory(cat)
-    if (data?.products) {
-      setProducts(cat === 'all' ? data.products : data.products.filter((p: Product) => {
-        const pCatSlug = p.category?.slug || ''
-        return pCatSlug === cat || p.tags?.toLowerCase().includes(cat.replace(/-/g, ' '))
-      }))
-    }
   }
 
   function handleSortChange(sort: string) {
     setSortBy(sort)
-    if (products.length > 0) {
-      const sorted = [...products].sort((a, b) => {
-        switch (sort) {
-          case 'revenue': return (b.revenue || 0) - (a.revenue || 0)
-          case 'sales': return (b.salesCount || b.studentCount || 0) - (a.salesCount || a.studentCount || 0)
-          case 'demand': return b.demandScore - a.demandScore
-          case 'opportunity': return (b.opportunityScore || 0) - (a.opportunityScore || 0)
-          default: return (b.revenue || 0) - (a.revenue || 0)
-        }
-      })
-      setProducts(sorted)
-    }
   }
 
   if (!data) return <div className="text-center py-12 text-muted-foreground">Yukleniyor...</div>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { refreshAllPlatforms, refreshPlatform, getLastRefreshTimestamp } from '@/lib/refresh'
+import { verifyCronSecret } from '@/lib/auth'
 
 export async function GET() {
   try {
@@ -11,19 +12,19 @@ export async function GET() {
       supportedPlatforms: ['gumroad', 'udemy', 'capafy'],
     })
   } catch (error) {
+    console.error('Refresh GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: Request) {
   try {
-    // CRON_SECRET dogrulama (opsiyonel - sadece header gonderilmisse kontrol et)
+    // GUVENLIK: x-cron-secret header'i ZORUNLU ve constant-time dogrulanir.
+    // Header yoksa veya secret ayarli degilse -> 401.
+    // (Onceki !authHeader || ... mantigi header gondermeyince erisime izin veriyordu.)
     const authHeader = request.headers.get('x-cron-secret')
-    const expectedSecret = process.env.CRON_SECRET
-    const isAuthorized = !authHeader || (expectedSecret ? authHeader === expectedSecret : true)
-
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Unauthorized - invalid or missing x-cron-secret header' }, { status: 401 })
+    if (!verifyCronSecret(authHeader)) {
+      return NextResponse.json({ error: 'Unauthorized - valid x-cron-secret header required' }, { status: 401 })
     }
 
     // Hangi platform? (optional)

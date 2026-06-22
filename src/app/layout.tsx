@@ -1,9 +1,14 @@
 import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import { ThemeProvider } from "next-themes"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 
-const geistSans = { variable: "--font-geist-sans", subsets: ["latin"] as const }
-const geistMono = { variable: "--font-geist-mono", subsets: ["latin"] as const }
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: "Multi-Pazar Analiz Pro | Gumroad + Udemy + Capafy AI",
@@ -22,9 +27,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className="antialiased bg-background text-foreground">
-        {children}
-        <Toaster />
+      <body className={`${inter.variable} font-sans antialiased bg-background text-foreground`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )

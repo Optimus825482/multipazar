@@ -8,43 +8,47 @@ const __dirname = dirname(__filename);
 
 const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
   rules: {
-    // TypeScript rules
-    "@typescript-eslint/no-explicit-any": "off",
-    "@typescript-eslint/no-unused-vars": "off",
-    "@typescript-eslint/no-non-null-assertion": "off",
-    "@typescript-eslint/ban-ts-comment": "off",
-    "@typescript-eslint/prefer-as-const": "off",
-    "@typescript-eslint/no-unused-disable-directive": "off",
-    
-    // React rules
-    "react-hooks/exhaustive-deps": "off",
-    "react-hooks/purity": "off",
+    // === TypeScript kurallari (koruyucu) ===
+    // any kullanimini uyari olarak birak - cok fazla yerde var, asamali olarak temizlenecek
+    "@typescript-eslint/no-explicit-any": "warn",
+    // Kullanilmayan degiskenleri yakala (alt cizgi ile baslayanlar muaf)
+    "@typescript-eslint/no-unused-vars": ["warn", {
+      argsIgnorePattern: "^_",
+      varsIgnorePattern: "^_",
+      caughtErrorsIgnorePattern: "^_",
+    }],
+    // ts-ignore yerine ts-expect-error kullan (neden belirtilmeli)
+    "@typescript-eslint/ban-ts-comment": ["error", {
+      "ts-expect-error": "allow-with-description",
+      "ts-ignore": true,
+      "ts-nocheck": true,
+      "ts-check": false,
+      minimumDescriptionLength: 10,
+    }],
+    "@typescript-eslint/no-non-null-assertion": "warn",
+
+    // === React kurallari ===
+    // exhaustive-deps hook bug'larini onler - once warn, sonra error
+    "react-hooks/exhaustive-deps": "warn",
     "react/no-unescaped-entities": "off",
     "react/display-name": "off",
     "react/prop-types": "off",
-    "react-compiler/react-compiler": "off",
-    
-    // Next.js rules
-    "@next/next/no-img-element": "off",
-    "@next/next/no-html-link-for-pages": "off",
-    
-    // General JavaScript rules
-    "prefer-const": "off",
-    "no-unused-vars": "off",
-    "no-console": "off",
-    "no-debugger": "off",
-    "no-empty": "off",
-    "no-irregular-whitespace": "off",
-    "no-case-declarations": "off",
-    "no-fallthrough": "off",
-    "no-mixed-spaces-and-tabs": "off",
-    "no-redeclare": "off",
-    "no-undef": "off",
-    "no-unreachable": "off",
-    "no-useless-escape": "off",
+
+    // === Next.js kurallari ===
+    "@next/next/no-img-element": "warn",
+
+    // === Genel JavaScript kurallari ===
+    "prefer-const": "error",
+    "no-unused-vars": "off", // TS versiyonu kullaniliyor
+    "no-console": ["warn", { allow: ["warn", "error"] }],
+    "no-debugger": "error",
+    "no-empty": ["error", { allowEmptyCatch: true }],
+    "no-unreachable": "error",
+    "no-useless-escape": "warn",
+    "no-irregular-whitespace": "error",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills/**", "scripts/**"],
 }];
 
 export default eslintConfig;
