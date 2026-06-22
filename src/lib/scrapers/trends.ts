@@ -23,11 +23,29 @@ export interface TrendResult {
  */
 
 const GT_BASE = 'https://trends.google.com/trends/api'
+const GT_RATE_LIMIT_COOLDOWN_MS = 15 * 60 * 1000
+
+let googleTrendsCooldownUntil = 0
+
+function isGoogleTrendsCoolingDown(): boolean {
+  return Date.now() < googleTrendsCooldownUntil
+}
+
+function startGoogleTrendsCooldown(keyword: string, status: number) {
+  googleTrendsCooldownUntil = Date.now() + GT_RATE_LIMIT_COOLDOWN_MS
+  console.warn(
+    `[Google Trends] "${keyword}" HTTP ${status}; ${Math.round(GT_RATE_LIMIT_COOLDOWN_MS / 60000)} dk cooldown baslatildi`
+  )
+}
 
 export async function fetchKeywordTrends(
   keyword: string
 ): Promise<TrendResult | null> {
   try {
+    if (isGoogleTrendsCoolingDown()) {
+      return null
+    }
+
     // 1. Explore API - trend widget bilgisini al
     const exploreUrl = `${GT_BASE}/explore?hl=en-US&tz=-180&req=${encodeURIComponent(JSON.stringify({
       comparisonItem: [{ keyword, geo: '', time: 'today 12-m' }],
@@ -44,6 +62,10 @@ export async function fetchKeywordTrends(
     })
 
     if (!exploreRes.ok) {
+      if (exploreRes.status === 429) {
+        startGoogleTrendsCooldown(keyword, exploreRes.status)
+        return null
+      }
       console.warn(`[Google Trends] "${keyword}" explore HTTP ${exploreRes.status}`)
       return null
     }
@@ -80,6 +102,10 @@ export async function fetchKeywordTrends(
     })
 
     if (!widgetRes.ok) {
+      if (widgetRes.status === 429) {
+        startGoogleTrendsCooldown(keyword, widgetRes.status)
+        return null
+      }
       console.warn(`[Google Trends] "${keyword}" widget HTTP ${widgetRes.status}`)
       return null
     }
@@ -156,6 +182,11 @@ export async function fetchMultipleTrends(
   // Sequential - her seferinde 1 istek, 2sn bekle
   // Google Trends 429 hatasini onlemek icin paralellik yok
   for (const keyword of keywords) {
+    if (isGoogleTrendsCoolingDown()) {
+      console.warn('[Google Trends] Cooldown aktif; kalan trend istekleri atlandi')
+      break
+    }
+
     const trend = await fetchKeywordTrends(keyword)
     if (trend) {
       results.set(keyword, trend)
