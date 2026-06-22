@@ -3,6 +3,21 @@ import { refreshAllPlatforms, refreshPlatform, getLastRefreshTimestamp } from '@
 import { verifyCronSecret } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+function isSameOriginRequest(request: Request): boolean {
+  const origin = request.headers.get('origin')
+  const host = request.headers.get('host')
+
+  if (!origin || !host) {
+    return false
+  }
+
+  try {
+    return new URL(origin).host === host
+  } catch {
+    return false
+  }
+}
+
 export async function GET() {
   try {
     const [lastRefresh, activeJob, lastJob] = await Promise.all([
@@ -32,11 +47,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    // GUVENLIK: x-cron-secret header'i ZORUNLU ve constant-time dogrulanir.
-    // Header yoksa veya secret ayarli degilse -> 401.
-    // (Onceki !authHeader || ... mantigi header gondermeyince erisime izin veriyordu.)
+    // GUVENLIK: Dis cron/API cagrilarinda x-cron-secret zorunludur.
+    // Uygulamanin kendi UI'indan gelen manuel refresh ayni-origin ise kabul edilir;
+    // secret client tarafina gonderilmez.
     const authHeader = request.headers.get('x-cron-secret')
-    if (!verifyCronSecret(authHeader)) {
+    if (!verifyCronSecret(authHeader) && !isSameOriginRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized - valid x-cron-secret header required' }, { status: 401 })
     }
 
