@@ -1,5 +1,5 @@
 /**
- * Middleware - API route'lari icin rate limiting ve guvenlik basliklari.
+ * Proxy - API route'lari icin rate limiting ve guvenlik basliklari.
  *
  * Simdilik rate limiting (IP tabanli in-memory) uygulanmistir.
  * Uretimde Redis tabanli cozum onerilir (upstash/upstash-rate-limiter).
@@ -44,7 +44,7 @@ function getRateLimiter(limit: number, windowMs: number) {
 const apiLimiter = getRateLimiter(100, 60 * 1000) // 100 istek/dakika
 const refreshLimiter = getRateLimiter(5, 60 * 1000) // 5 istek/dakika refresh endpoint
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Sadece API route'larina rate limit uygula

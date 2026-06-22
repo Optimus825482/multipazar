@@ -8,6 +8,7 @@ node_modules
 .env.local
 .env.production
 scripts/*
+!scripts/copy-standalone-assets.mjs
 !scripts/start.sh
 upload/
 tool-results/

@@ -102,6 +102,21 @@ model RefreshLog {
   createdAt DateTime @default(now())
 }
 
+model RefreshJob {
+  id         String    @id @default(cuid())
+  platform   String    // "gumroad" | "udemy" | "capafy" | "all"
+  status     String    @default("running") // "running" | "success" | "error"
+  message    String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  duration   Int?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([status, platform])
+  @@index([createdAt])
+}
+
 model ProductIdea {
   id          String   @id @default(cuid())
   platform    String   // "gumroad" | "udemy" | "capafy"
