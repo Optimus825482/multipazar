@@ -16,11 +16,11 @@ model Category {
   icon            String?
   color           String?
   avgPrice        Float
-  totalProducts   Int       @default(0)
+  totalProducts   Int       @default(0)         // Sample scraped count
   totalCourses    Int       @default(0)
-  totalRevenue    Float
+  totalRevenue    Float                          // Estimated (heuristic) if native missing
   totalStudents   Int?      // Udemy-specific
-  searchVolume    Int
+  searchVolume    Int                           // Google Trends popularity score (0-100 relative)
   demandScore     Float
   supplyScore     Float
   competitionIndex Float
@@ -28,6 +28,13 @@ model Category {
   trendDirection  String    @default("up") // "up", "down", "stable"
   avgRating       Float?
   avgReviews      Int?
+  // -- v2: gercek veri dogrulugu --
+  realTotalProducts  Int?     // Platform'un verdigi GERCEK toplam (scraper sample'i degil)
+  sampleSize         Int?     // Bu kategoride kac urun cekildi
+  platformCategoryId String?  // Capafy categoryId (1-28) veya Gumroad taxonomy slug
+  dataFreshness      DateTime?// Son basarili scrape zamani
+  scrapingStrategy   String?  // "union" | "single" | "category" | "pagination"
+  revenueEstimationMethod String? // "platform_native" | "price_x_sales" | "price_x_estimated_sales" | "free_only"
   source          String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -64,8 +71,17 @@ model Product {
   isTrending      Boolean   @default(false)
   url             String?
   gumroadUrl      String?
+  // -- v2: gercek veri dogrulugu --
+  salesEstimationMethod String? // "platform_native" | "review_heuristic" | "volume_heuristic" | "free_trial" | "developer_proxy"
+  popularityScore       Float?  // Google Trends 0-100 relative score (kayit zamaninda trend degeri)
+  platformProductId     String?  // Capafy agentId, Gumroad permalink, vs.
+  titleSlug             String?  // Capafy titleSlug, Gumroad permalink
+  isFree                Boolean  @default(false) // price=0 ise true
+  hasFreeTrial          Boolean  @default(false) // Capafy supportFreeTrial
+  dataSource            String?  // JSON: { endpoint, version, fetchedAt }
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  tags_rel        ProductTag[]
 }
 
 model MarketInsight {
@@ -105,7 +121,7 @@ model RefreshLog {
 model RefreshJob {
   id         String    @id @default(cuid())
   platform   String    // "gumroad" | "udemy" | "capafy" | "all"
-  status     String    @default("running") // "running" | "success" | "error"
+  status     String    @default("running") // "running" | "success" | "error" | "partial"
   message    String?
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
@@ -115,6 +131,62 @@ model RefreshJob {
 
   @@index([status, platform])
   @@index([createdAt])
+}
+
+// -- v2: yeni tablolar (gercek veri dogrulugu icin) --
+model Tag {
+  id          String   @id @default(cuid())
+  name        String
+  platform    String
+  productCount Int     @default(0)
+  docCount    Int?     // Platform'un verdigi tag frequency (Gumroad tags_data)
+  createdAt   DateTime @default(now())
+  products    ProductTag[]
+
+  @@unique([platform, name])
+  @@index([platform])
+}
+
+model ProductTag {
+  productId String
+  tagId     String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@index([tagId])
+}
+
+model DataSourceRun {
+  id             String   @id @default(cuid())
+  platform       String   // "capafy" | "gumroad" | "trends"
+  source         String   // "agent/agents/search" | "discover" | "trends/api/explore" | "category"
+  startedAt      DateTime
+  finishedAt     DateTime?
+  status         String   // "running" | "success" | "partial" | "error"
+  recordsFetched Int      @default(0)
+  recordsSaved   Int      @default(0)
+  recordsSkipped Int      @default(0)
+  errorMessage   String?
+  requestSample  String?  // Ilk 500 char response (debug)
+  createdAt      DateTime @default(now())
+
+  @@index([platform, startedAt])
+}
+
+model TrendingSignal {
+  id           String   @id @default(cuid())
+  platform     String   // "gumroad" | "capafy"
+  categorySlug String?
+  keyword      String
+  signalSource String   // "google_trends" | "reddit_json" | "youtube_trending" | "rss"
+  metricName   String   // "popularity_score" | "post_count" | "comment_count" | "upvote_count"
+  metricValue  Float
+  rawJson      String?  // JSON debug
+  observedAt   DateTime @default(now())
+
+  @@index([platform, signalSource, observedAt])
+  @@index([categorySlug])
 }
 
 model ProductIdea {

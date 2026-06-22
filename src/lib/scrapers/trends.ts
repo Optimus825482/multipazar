@@ -26,6 +26,7 @@ const GT_BASE = 'https://trends.google.com/trends/api'
 const GT_RATE_LIMIT_COOLDOWN_MS = 15 * 60 * 1000
 
 let googleTrendsCooldownUntil = 0
+const SKIP_TRENDS = process.env.SKIP_TRENDS === '1' || process.env.SKIP_TRENDS === 'true'
 
 function isGoogleTrendsCoolingDown(): boolean {
   return Date.now() < googleTrendsCooldownUntil
@@ -42,6 +43,9 @@ export async function fetchKeywordTrends(
   keyword: string
 ): Promise<TrendResult | null> {
   try {
+    if (SKIP_TRENDS) {
+      return null
+    }
     if (isGoogleTrendsCoolingDown()) {
       return null
     }

@@ -1,0 +1,3036 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Capafy User Agent API",
+    "description": "Capafy User Agent API (user-facing Agent API, intended for external developers / Agent callers).\n\n## General conventions\n- Unless stated otherwise, every response uses the unified envelope `R<T>`: `code` (business code, 0 means success), `msg` (message), `data` (payload).\n- Authentication uses an Access Token (prefix `am_sk_`), supplied either as `Authorization: Bearer <token>` or `X-Access-Token: <token>`.\n- `/auth/**` requires no authentication; all other endpoints require an Access Token.\n- Amounts and prices are in USD; the currency is currently fixed to `usd`.\n\n## Authentication lifecycle\n1. `POST /auth/login` with an email to send a one-time code (OTP) and receive a `challengeId`.\n2. `POST /auth/login/verify` with `challengeId` + `code` to obtain `data.accessToken`.\n3. Persist `data.accessToken` securely and send it as the Bearer token (or `X-Access-Token`) on every subsequent `/agent/**` request.\n\n## Exception: the 04_Chat module\nThe following endpoints do **not** use the `R<T>` envelope; they return `text/event-stream` or raw JSON:\n- `POST /agent/relay/instances/{instanceId}/messages` (send message and open the SSE stream)\n- `POST /agent/relay/instances/{instanceId}/messages/reconnect` (SSE reconnect)\n- `POST /agent/relay/instances/{instanceId}/interrupt` (interrupt task)\n- `GET  /agent/relay/instances/{instanceId}/messages` (pull offline messages)\n\nSSE events have only three `type` values: `message` / `timeout` / `done`.\n",
+    "version": "1.0.0",
+    "x-api-lifecycle": {
+      "status": "stable",
+      "deprecation-policy": "Backward-incompatible (breaking) changes are announced at least 90 days in advance via the changelog and email to registered developers, and the superseded version stays available throughout that window. We maintain backward compatibility wherever possible; additive, non-breaking changes (new endpoints, new optional fields/parameters) may ship at any time without prior notice and without a version bump.",
+      "versioning-strategy": "Major versions are carried in the path prefix. The current endpoints are unversioned and are treated as v1; they will remain available unchanged when a future major version ships under a new prefix (e.g. /v2/). For finer-grained control within a major version, clients may optionally pin behavior with a dated 'Api-Version: YYYY-MM-DD' request header; omitting it selects the latest stable behavior of that major version."
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.capafy.ai",
+      "description": "Capafy Agent API base URL"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Authentication (no auth required)"
+    },
+    {
+      "name": "Search",
+      "description": "Search and detail"
+    },
+    {
+      "name": "Order",
+      "description": "Orders and top-up"
+    },
+    {
+      "name": "Chat",
+      "description": "Chat and messages (SSE / non-R<T> responses)"
+    },
+    {
+      "name": "Instance",
+      "description": "Instance"
+    },
+    {
+      "name": "Subscription",
+      "description": "Subscription"
+    },
+    {
+      "name": "Download",
+      "description": "Download"
+    },
+    {
+      "name": "Account",
+      "description": "Account"
+    }
+  ],
+  "security": [
+    {
+      "BearerAccessToken": []
+    },
+    {
+      "AccessTokenHeader": []
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "authLogin",
+        "summary": "Send login verification code",
+        "description": "Sends a one-time code (OTP) to the email and returns a `challengeId`.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AuthLoginResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login/verify": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "authLoginVerify",
+        "summary": "Verify OTP and complete Agent login",
+        "description": "Verifies the email OTP, completes Agent login, and returns an `accessToken`.\n- In the Agent scope, `source` is fixed to `agent`.\n- If the email is not yet registered, the user, wallet, and a default accessToken are created automatically.\n- The `challengeId` is invalidated immediately whether verification succeeds or fails.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AuthVerifyResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/agent/agents/{agentId}": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "getAgentOnlineDetail",
+        "summary": "Get published Agent detail",
+        "description": "Returns the currently published, publicly visible version detail for `agentId`\n(only returned when the Agent is `online` and has a latest published version).\nDoes not return internal fields such as credential config, audit status, package URL, or timestamps.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AgentOnlineDetailVO"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error. Typical codes: `400` (blank agentId), `2004` AGENT_NOT_FOUND, `2010` AGENT_NOT_AVAILABLE.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/agent/agents/search": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "searchAgents",
+        "summary": "Demand-matching search",
+        "description": "Calls the retrieval service (Capafy) with a natural-language demand description, returns matching Agents,\nand enriches each with local display fields and a relevance score.\nNo request body; parameters are passed via query. Price filtering applies only when both `minPrice` and `maxPrice` are present.\n",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User search demand description"
+          },
+          {
+            "name": "minPrice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Minimum price; effective only when sent together with maxPrice"
+          },
+          {
+            "name": "maxPrice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Maximum price; effective only when sent together with minPrice"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SearchListResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/agent/review/agents/{agentId}/review": {
+      "post": {
+        "tags": [
+          "Order"
+        ],
+        "operationId": "createReview",
+        "summary": "Create review",
+        "description": "The current user reviews the specified Agent. Requires a valid purchase record; one review per user per Agent.\nA `deleted` previous review is revived and updated; a `violation` previous review cannot be re-published.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success (reviewId is not returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical codes: `2004` AGENT_NOT_FOUND, `4048` AGENT_REVIEW_PURCHASE_REQUIRED,\n`4049` AGENT_REVIEW_ALREADY_EXISTS, `4050` AGENT_REVIEW_VIOLATION, `400` (rating/comment validation failed).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/orders/buyer/create": {
+      "post": {
+        "tags": [
+          "Order"
+        ],
+        "operationId": "createBuyerOrder",
+        "summary": "Create order",
+        "description": "Place a new order or renew. Always paid with `credit`.\n- New order: `agentId` is required; `hours` is required for hourly plans; `billingLineNo` selects a billing plan (0/1/2, default 0).\n- Renewal: passing `instanceId` switches to renewal mode. Hourly-instance renewal requires `hours`; expired-subscription renewal omits `hours`.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/OrderCreateResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error (invalid params, insufficient balance, unsupported pricing, invalid renewal target, etc.). Idempotency: `400` BAD_REQUEST when the same `Idempotency-Key` is reused with a different request body; `429` TOO_MANY_REQUESTS when the first request for that key is still being processed (retry later with the same key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ]
+      }
+    },
+    "/agent/orders/buyer/list": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "operationId": "listBuyerOrders",
+        "summary": "User order list",
+        "description": "Returns the current user's transaction order / invoice list (subscriptions return invoices). Not paginated, sorted by creation time descending.\n",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Order status filter",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending_payment",
+                "payment_failed",
+                "paid",
+                "refunding",
+                "refunded",
+                "completed"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OrderListItem"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/agent/orders/buyer/{orderId}/detail": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "operationId": "getBuyerOrderDetail",
+        "summary": "User order detail",
+        "description": "Returns a single order / invoice detail. `orderId` supports the `buy-`/`hou-`/`cre-`/`str-` prefixes.\nFor subscriptions this returns the first-invoice detail; do not pass a `subscriptionId` from other subscription endpoints as `orderId`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrderIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/OrderDetail"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error (orderId not found / not owned by the current user, etc.)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/orders/topup/create": {
+      "post": {
+        "tags": [
+          "Order"
+        ],
+        "operationId": "createTopupOrder",
+        "summary": "Create top-up order",
+        "description": "Creates a Credits top-up order and returns a Stripe Checkout link. Currently `1 USD = 1 Credit`,\nwith a minimum top-up threshold of `10` USD (enforced at the service layer). Credits are added after the Stripe webhook confirms payment.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopupCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/TopupCreateResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical codes: `400` BAD_REQUEST (amount below 10 USD, or same `Idempotency-Key` reused with a different request body), `429` TOO_MANY_REQUESTS (first request for the same `Idempotency-Key` still processing; retry later with the same key), `6001` USER_ACCOUNT_UNAVAILABLE, `5005` CREATE_STRIPE_PAYMENT_INTENT_FAILED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ]
+      }
+    },
+    "/agent/relay/instances/{instanceId}/messages": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "sendMessage",
+        "summary": "Send message and open SSE stream",
+        "description": "Starts a new task on the instance and opens an SSE long connection. **Does not use the R<T> envelope.**\nOn success returns `text/event-stream`; if rejected returns JSON.\nSSE event `type` is only `message` / `timeout` / `done`; after a `timeout` the server usually ends the SSE,\nand the result can be retrieved via the offline-messages endpoint. Callers must check both the HTTP status code and `Content-Type`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InstanceIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stream opened, returns an SSE long connection",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "SSE event stream. Each `data` is one RelayMessage JSON (see the RelayMessage schema).\nThe event name matches the type: `message` / `timeout` / `done`.\n"
+                },
+                "examples": {
+                  "stream": {
+                    "summary": "Example event sequence",
+                    "value": "event: message\ndata: {\"type\":\"message\",\"messageId\":\"msg_xxx\",\"seq\":0,\"time\":1711111111000,\"content\":\"Received your message...\",\"files\":[]}\n\nevent: done\ndata: {\"type\":\"done\",\"messageId\":\"msg_xxx\",\"seq\":2,\"time\":1711111113000,\"content\":null,\"files\":[]}\n"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or blocked by the high-risk sensitive-information-extraction filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A task is already in progress (message_in_progress)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageInProgressError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Instance no longer accepts messages (IDLE / PURGED)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "pullOfflineMessages",
+        "summary": "Pull offline messages (one-time consumption)",
+        "description": "Reads Agent-visible messages from the offline queue once, when no SSE stream is connected. **Does not use the R<T> envelope.**\nAfter reading, the queue is consumed; a subsequent call usually returns an empty array, so callers must persist results themselves.\nReturns only `message` and `done` (startup placeholders are projected to message); `timeout` and ordinary process events are not returned.\nWhen the instance does not exist or is not accessible, it likewise returns `{\"messages\": []}`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InstanceIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfflineMessagesResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/agent/relay/instances/{instanceId}/messages/reconnect": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "reconnectMessageStream",
+        "summary": "Reconnect relay message SSE",
+        "description": "Re-attaches the SSE stream for a running task without sending a new message. **Does not use the R<T> envelope.**\nOn success returns `text/event-stream` (the first message has content `Reconnected.`, seq=0);\nwhen there is no active task it returns `200 application/json` with `{\"status\":\"no_active_task\"}`.\nCallers must handle both `text/event-stream` and `application/json`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InstanceIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One of two forms: a successful reconnect SSE (text/event-stream), or a no-active-task JSON (application/json).\n",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "SSE long connection; event structure matches RelayMessage"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "no_active_task"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/agent/relay/instances/{instanceId}/interrupt": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "interruptTask",
+        "summary": "Interrupt running task",
+        "description": "Requests interruption of the instance's currently running task. **Does not use the R<T> envelope.**\nA `200` only means the request was accepted; the task's terminal state still arrives via the existing SSE. Multiple interrupts are allowed.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InstanceIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Interrupt request accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterruptAcceptedResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No active task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelayErrorResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Instance is busy (instance_busy)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelayErrorResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/file/presign/upload": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "presignUpload",
+        "summary": "Get a presigned upload URL",
+        "description": "Generates a temporary PUT presigned URL for a file to be uploaded. For user-side chat files, `bizType` is fixed to `buyer_agent`.\nAfter obtaining `uploadUrl`, the caller PUTs the file binary directly and saves the returned `objectKey`.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PresignUploadResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical: validation failed, `STORAGE_NOT_ENABLED`, `STORAGE_CONFIG_INVALID`, `STORAGE_PRESIGN_FAILED`.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/file/presign/download": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "presignDownload",
+        "summary": "Get a presigned download URL",
+        "description": "Generates a temporary GET download URL from an existing `objectKey`. Currently only basic format validation is performed; object ownership is not checked.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignDownloadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PresignDownloadResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error (invalid params, storage not enabled / config invalid / presign failed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/instance": {
+      "get": {
+        "tags": [
+          "Instance"
+        ],
+        "operationId": "listInstances",
+        "summary": "Instance list",
+        "description": "Returns the current user's instances grouped by status. `status` supports `active` (default) or `expired`.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "expired"
+              ],
+              "default": "active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/InstanceListResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error (invalid status, etc., `400` BAD_REQUEST)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/instance/{instanceId}": {
+      "patch": {
+        "tags": [
+          "Instance"
+        ],
+        "operationId": "renameInstance",
+        "summary": "Rename instance",
+        "description": "Renames the specified instance owned by the current user (1-50 chars; the server trims it).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InstanceIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceRenameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/InstanceRenameResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical: `8001` INSTANCE_NOT_FOUND (not found or not owned), `400` BAD_REQUEST (name validation failed).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/orders/instance-storage/renew": {
+      "post": {
+        "tags": [
+          "Instance"
+        ],
+        "operationId": "renewInstanceStorage",
+        "summary": "Renew instance storage",
+        "description": "Pays the storage fee for an instance in `idle` state (grace period) whose `purge_at` has not passed, extending its retention.\nAlways paid with `credit`, `2.00 credit` per month extending 30 days; `renewMonths` ranges 1-12.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageRenewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/StorageRenewResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical: `8001` INSTANCE_NOT_FOUND, `8002` INSTANCE_RENEW_NOT_ALLOWED,\n`5007` WALLET_CREDITS_AVAILABLE_NOT_ENOUGH, `429` TOO_MANY_REQUESTS, invalid params.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/subscriptions/list": {
+      "get": {
+        "tags": [
+          "Subscription"
+        ],
+        "operationId": "listSubscriptions",
+        "summary": "Subscription list",
+        "description": "Returns the current user's subscriptions by status. `status` supports `active`/`retrying`/`canceled`/`expired`; omitting it returns all displayable states.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "retrying",
+                "canceled",
+                "expired"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SubscriptionListResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error (invalid status, `400` BAD_REQUEST)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/subscriptions/{subscriptionId}/cancel": {
+      "post": {
+        "tags": [
+          "Subscription"
+        ],
+        "operationId": "cancelSubscription",
+        "summary": "Cancel subscription",
+        "description": "Cancels auto-renewal (current period stays usable; no renewal after it ends). Only the user's own `active` subscription can be canceled.\nStripe subscriptions are synced to `cancel_at_period_end=true`; the local state updates only after the channel succeeds.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SubscriptionIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SubscriptionCancelResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical: `4029` SUBSCRIPTION_NOT_FOUND, `4039` SUBSCRIPTION_STATUS_INVALID,\n`4040` SUBSCRIPTION_PROVIDER_SYNC_FAILED.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/subscriptions/{subscriptionId}/resume": {
+      "post": {
+        "tags": [
+          "Subscription"
+        ],
+        "operationId": "resumeSubscription",
+        "summary": "Resume subscription",
+        "description": "Resumes auto-renewal for a \"canceled but not yet expired\" subscription, continuing the current period (no new period is started).\nOnly the user's own `canceled`, not-yet-expired subscription can be resumed.\nStripe subscriptions are synced to `cancel_at_period_end=false`; the local state updates only after the channel succeeds.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SubscriptionIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SubscriptionResumeResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical: `4029` SUBSCRIPTION_NOT_FOUND, `4039` SUBSCRIPTION_STATUS_INVALID,\n`4040` SUBSCRIPTION_PROVIDER_SYNC_FAILED.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/skill/{agentId}/versions": {
+      "get": {
+        "tags": [
+          "Download"
+        ],
+        "operationId": "listSkillVersions",
+        "summary": "Skill version history",
+        "description": "Lists the historical versions of a Skill (only formally published versions whose package is still locatable), sorted by version number descending, not paginated.\nApplies to Skills (download type) only, not hosted Agents. The `appVersionId` in each item can be used by download-related endpoints.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SkillVersionItem"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error (`400` invalid params, `2014` SKILL_NOT_FOUND)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/agent/agents/{agentId}/package": {
+      "get": {
+        "tags": [
+          "Download"
+        ],
+        "operationId": "getSkillPackage",
+        "summary": "Download Skill package",
+        "description": "Gets the downloadable package URL for the published Skill version (download type only). Returns `data.skillInstall.url` (may be a presigned or raw HTTP URL).\nFree plans can fetch it directly; paid plans require the current user to have purchased it.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/OrderDownloadVO"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical: `2004` AGENT_NOT_FOUND, `2010` AGENT_NOT_AVAILABLE (incl. non-download / no package / no billing plan),\n`4047` ORDER_DOWNLOAD_NOT_ALLOWED (paid Skill not purchased).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/orders/buyer/{orderId}/download": {
+      "get": {
+        "tags": [
+          "Download"
+        ],
+        "operationId": "getOrderDownloadInfo",
+        "summary": "Get order download info",
+        "description": "Returns download info for an order: download orders return `skillInstall`, hosted orders return `thinSkillTemplate`.\nOnly `paid`/`completed` orders may download; links are temporary presigned URLs (~60 minutes), call again after expiry.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrderIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/OrderDownloadVO"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Business error. Typical: `4019` ORDER_TYPE_NOT_SUPPORTED, `4003` ORDER_NOT_FOUND,\n`4047` ORDER_DOWNLOAD_NOT_ALLOWED, `2024` AGENT_PACKAGE_NOT_FOUND.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/account/profile": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "operationId": "getProfile",
+        "summary": "Get current user profile",
+        "description": "Returns the current user's profile description; `profile` is `null` if not set.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ProfileResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Account"
+        ],
+        "operationId": "updateProfile",
+        "summary": "Update current user profile",
+        "description": "Overwrites the current user's profile description; `profile` may be an empty string to clear it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/agent/account": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "operationId": "getAccountAggregate",
+        "summary": "Account aggregate info",
+        "description": "Returns the current user's email, role (fixed `consumer`), credit balance, auto-consume thresholds (safety valve), and developer flag.\n`autoConsume.monthlyUsed` is computed in real time from the orders table and cached for ~5 minutes.\n",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AccountAggregate"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAccessToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Access Token (prefix am_sk_), e.g. `Authorization: Bearer am_sk_xxx`"
+      },
+      "AccessTokenHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Access-Token",
+        "description": "Access Token (prefix am_sk_), passed via the `X-Access-Token` header"
+      }
+    },
+    "parameters": {
+      "AgentIdPath": {
+        "name": "agentId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Target Agent ID"
+      },
+      "InstanceIdPath": {
+        "name": "instanceId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Instance ID"
+      },
+      "OrderIdPath": {
+        "name": "orderId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Order ID / invoice ID (supports buy-/hou-/cre-/str- prefixes)"
+      },
+      "SubscriptionIdPath": {
+        "name": "subscriptionId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Subscription ID"
+      },
+      "ApiVersion": {
+        "name": "Api-Version",
+        "in": "header",
+        "required": false,
+        "description": "Optional. Pin behavior within the current major version, e.g. `2025-06-05`. Omit to use the latest stable behavior.",
+        "schema": {
+          "type": "string",
+          "example": "2025-06-05"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "description": "Optional. Prevents a retried/duplicated request (network jitter, timeout retry, double-click) from creating a duplicate order or charge. UUID v4 recommended. When provided, the server caches the first SUCCESSFUL response for 24h, keyed by (current user + this endpoint + Idempotency-Key); a retry with the same key returns that cached response instead of creating a new order. Reuse the same key only for retries of the same request; generate a new key for every new business request. Same key with a different request body within 24h -> `400 BAD_REQUEST`. If the first request with this key is still processing, the duplicate briefly waits and then returns `429 TOO_MANY_REQUESTS` (retry later with the same key). A failed first request releases the key so it can be retried.",
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "example": "7f3e8a8e-2b4d-4c77-9d0a-1d7e5f4a2c91"
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Unauthorized (token missing, invalid, expired, or revoked)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiResponse"
+            },
+            "example": {
+              "code": 401,
+              "msg": "Unauthorized: an Access Token is required",
+              "data": null
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "description": "Unified response envelope R<T>",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business code; 0 means success"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "nullable": true,
+            "description": "Payload; usually null on failure"
+          }
+        },
+        "required": [
+          "code",
+          "msg"
+        ]
+      },
+      "FileRef": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "originalFileName": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthLoginRequest": {
+        "type": "object",
+        "required": [
+          "loginMethod",
+          "email"
+        ],
+        "properties": {
+          "loginMethod": {
+            "type": "string",
+            "enum": [
+              "email"
+            ],
+            "description": "Login method; currently fixed to email"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "AuthLoginResult": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string"
+          },
+          "expiresInSec": {
+            "type": "integer",
+            "description": "Challenge validity in seconds (currently 600)"
+          }
+        }
+      },
+      "AuthVerifyRequest": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "code",
+          "source"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Email OTP code"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "agent"
+            ],
+            "description": "Fixed to agent in the Agent scope"
+          }
+        }
+      },
+      "AuthVerifyResult": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "developerVerified": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "credits": {
+            "type": "number"
+          },
+          "creditsFrozen": {
+            "type": "number"
+          },
+          "balancePending": {
+            "type": "number"
+          },
+          "balanceConfirmed": {
+            "type": "number"
+          },
+          "balancePayout": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "accessToken": {
+            "type": "string",
+            "description": "Agent-scope access token (prefix am_sk_). Persist this securely and send it as the Bearer token (or X-Access-Token) on every subsequent /agent/** request."
+          }
+        }
+      },
+      "Billing": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer"
+          },
+          "billingMode": {
+            "type": "string",
+            "enum": [
+              "download",
+              "hourly",
+              "subscription"
+            ]
+          },
+          "minPurchaseHours": {
+            "type": "integer"
+          },
+          "hourlyPrice": {
+            "type": "number"
+          },
+          "hourlyMaxMessageCount": {
+            "type": "integer"
+          },
+          "oneTimeFee": {
+            "type": "number",
+            "nullable": true
+          },
+          "cycleType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "day",
+              "week",
+              "month",
+              null
+            ]
+          },
+          "cyclePrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "cycleMaxMessageCount": {
+            "type": "integer",
+            "nullable": true
+          },
+          "containerMode": {
+            "type": "string",
+            "enum": [
+              "on_demand",
+              "scheduled"
+            ]
+          },
+          "runFrequencyValue": {
+            "type": "integer"
+          },
+          "runFrequencyUnit": {
+            "type": "string",
+            "enum": [
+              "minutes",
+              "hours",
+              "days"
+            ]
+          },
+          "dailyRunAt": {
+            "type": "string",
+            "description": "Format HH:mm"
+          },
+          "patrolPrompt": {
+            "type": "string"
+          },
+          "p2aAutoRecognize": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityPrivacy": {
+        "type": "object",
+        "properties": {
+          "agentBaseModel": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "externalApis": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serviceName": {
+                  "type": "string"
+                },
+                "purpose": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AgentOnlineVersion": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string"
+          },
+          "agentVersionId": {
+            "type": "string"
+          },
+          "agentPackageId": {
+            "type": "string"
+          },
+          "agentType": {
+            "type": "string"
+          },
+          "agentRuntime": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "shortDescription": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "integer"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "supportEmail": {
+            "type": "string"
+          },
+          "concurrencyLimit": {
+            "type": "integer"
+          },
+          "estimatedExecutionMinutes": {
+            "type": "integer"
+          },
+          "versionNo": {
+            "type": "integer"
+          },
+          "versionName": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string"
+          },
+          "workflowInfo": {
+            "type": "string"
+          },
+          "detailedDescription": {
+            "type": "string"
+          },
+          "versionUpdateInfo": {
+            "type": "string"
+          },
+          "securityPrivacy": {
+            "$ref": "#/components/schemas/SecurityPrivacy"
+          },
+          "billings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Billing"
+            }
+          },
+          "billingMode": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "minPurchaseHours": {
+            "type": "integer",
+            "nullable": true
+          },
+          "hourlyPrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "hourlyMaxMessageCount": {
+            "type": "integer",
+            "nullable": true
+          },
+          "oneTimeFee": {
+            "type": "number",
+            "nullable": true
+          },
+          "cycleType": {
+            "type": "string",
+            "nullable": true
+          },
+          "cyclePrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "cycleMaxMessageCount": {
+            "type": "integer",
+            "nullable": true
+          },
+          "containerMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "runFrequencyValue": {
+            "type": "integer",
+            "nullable": true
+          },
+          "runFrequencyUnit": {
+            "type": "string",
+            "nullable": true
+          },
+          "dailyRunAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "patrolPrompt": {
+            "type": "string",
+            "nullable": true
+          },
+          "p2aAutoRecognize": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AgentOnlineDetailVO": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string"
+          },
+          "agentType": {
+            "type": "string",
+            "description": "Typical values: run_online / download"
+          },
+          "name": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "agentStatus": {
+            "type": "string"
+          },
+          "latestOnlineVersion": {
+            "$ref": "#/components/schemas/AgentOnlineVersion"
+          }
+        }
+      },
+      "SearchItem": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string"
+          },
+          "agentVersionId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "number"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "agentType": {
+            "type": "string"
+          },
+          "billingMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "billings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Billing"
+            }
+          },
+          "agentCard": {
+            "type": "object",
+            "description": "Current display version card detail; fields per the actual response"
+          },
+          "salesVolume": {
+            "type": "number"
+          },
+          "rating": {
+            "type": "number"
+          },
+          "creditScore": {
+            "type": "number",
+            "description": "Seller credit score; defaults to 100 when no record"
+          },
+          "score": {
+            "type": "number",
+            "description": "Capafy relevance score"
+          },
+          "scoreBreakdown": {
+            "type": "object",
+            "description": "Capafy score breakdown; structure per the external service"
+          },
+          "capafyExtra": {
+            "type": "object",
+            "description": "Capafy hit extra fields"
+          }
+        }
+      },
+      "SearchListResponse": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchItem"
+            }
+          }
+        }
+      },
+      "ReviewRequest": {
+        "type": "object",
+        "required": [
+          "rating"
+        ],
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "OrderCreateRequest": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "description": "Required for a new order; may be omitted for renewal"
+          },
+          "hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 24,
+            "description": "Required for hourly plans; must satisfy the plan's minPurchaseHours; omitted for subscription renewal"
+          },
+          "billingLineNo": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              2
+            ],
+            "default": 0,
+            "description": "Billing plan line number; effective only for new orders"
+          },
+          "instanceId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Passing it switches to renewal mode"
+          }
+        }
+      },
+      "OrderCreateResult": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "description": "Prefix buy-/hou-/cre-; subscriptions return the first-invoice orderId"
+          },
+          "status": {
+            "type": "string",
+            "description": "Usually paid for successful credit payment"
+          },
+          "stripCheckoutUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Fixed null for credit payment"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "usageStartAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "usageEndAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "welcomeMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "OrderListItem": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "buyerId": {
+            "type": "string"
+          },
+          "developerId": {
+            "type": "string"
+          },
+          "developerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "developerEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "agentVersionId": {
+            "type": "string"
+          },
+          "agentCardBillingId": {
+            "type": "string"
+          },
+          "agentTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "instanceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "refundId": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "credit / stripe"
+          },
+          "status": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "actualAmount": {
+            "type": "number"
+          },
+          "paymentFailureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "stripeHostedInvoiceUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "stripePaymentIntentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentDeadlineAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "paymentAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "refundDeadlineAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "refundedAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "OrderDetail": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "subscriptionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerId": {
+            "type": "string"
+          },
+          "developerId": {
+            "type": "string"
+          },
+          "developerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "developerEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "agentVersionId": {
+            "type": "string"
+          },
+          "agentCardBillingId": {
+            "type": "string"
+          },
+          "agentTitle": {
+            "type": "string"
+          },
+          "agentLogoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "instanceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "refundId": {
+            "type": "string",
+            "nullable": true
+          },
+          "oneTimeFee": {
+            "type": "number",
+            "nullable": true
+          },
+          "minPurchaseHours": {
+            "type": "integer",
+            "nullable": true
+          },
+          "hourlyPrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "purchaseTime": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Total purchased duration (minutes)"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "actualAmount": {
+            "type": "number"
+          },
+          "refundAmount": {
+            "type": "number"
+          },
+          "settlementRatio": {
+            "type": "number"
+          },
+          "developerAmount": {
+            "type": "number"
+          },
+          "developerActualAmount": {
+            "type": "number"
+          },
+          "platformFeeRate": {
+            "type": "number"
+          },
+          "platformFeeAmount": {
+            "type": "number"
+          },
+          "platformActualAmount": {
+            "type": "number"
+          },
+          "containerRunFee": {
+            "type": "number"
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "paymentFailureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "stripeHostedInvoiceUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "isSettled": {
+            "type": "boolean"
+          },
+          "usageStartAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "usageEndAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "paymentDeadlineAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "paymentAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "firstDownloadAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "refundDeadlineAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "refundedAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "TopupCreateRequest": {
+        "type": "object",
+        "required": [
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 10,
+            "description": "Top-up amount (USD); service-layer minimum is 10 USD"
+          }
+        }
+      },
+      "TopupCreateResult": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Fixed pending_payment on creation"
+          },
+          "stripCheckoutUrl": {
+            "type": "string",
+            "description": "Stripe Checkout payment page URL"
+          }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The message body sent to the Agent this round; must not be blank"
+          },
+          "originalQuestion": {
+            "type": "string"
+          },
+          "nextStepPlan": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileRef"
+            }
+          }
+        }
+      },
+      "RelayMessage": {
+        "type": "object",
+        "description": "Unified simplified structure for SSE / offline messages",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "message",
+              "timeout",
+              "done"
+            ]
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer"
+          },
+          "time": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "content": {
+            "type": "string",
+            "nullable": true,
+            "description": "May be null when done"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileRef"
+            }
+          },
+          "originalQuestion": {
+            "type": "string",
+            "description": "Returned on demand only when done"
+          },
+          "nextStepPlan": {
+            "type": "string",
+            "description": "Returned on demand only when done"
+          }
+        }
+      },
+      "OfflineMessagesResult": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelayMessage"
+            }
+          }
+        }
+      },
+      "InterruptAcceptedResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "interrupt_requested"
+            ]
+          },
+          "activeMessageId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "RelayErrorResult": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "no_active_task",
+              "instance_busy"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "MessageInProgressError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "message_in_progress"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "activeMessageId": {
+            "type": "string"
+          },
+          "interruptUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "PresignUploadRequest": {
+        "type": "object",
+        "required": [
+          "fileName",
+          "contentType",
+          "bizType"
+        ],
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "contentType": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "MIME type of the file to upload"
+          },
+          "bizType": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$",
+            "description": "Fixed to buyer_agent for user-side chat"
+          }
+        }
+      },
+      "PresignUploadResult": {
+        "type": "object",
+        "properties": {
+          "uploadMethod": {
+            "type": "string",
+            "description": "Currently fixed to PUT"
+          },
+          "uploadUrl": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Headers that must accompany the upload; includes at least Content-Type"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "originalFileName": {
+            "type": "string"
+          },
+          "publicUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Minimum 180 seconds"
+          }
+        }
+      },
+      "PresignDownloadRequest": {
+        "type": "object",
+        "required": [
+          "objectKey"
+        ],
+        "properties": {
+          "objectKey": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        }
+      },
+      "PresignDownloadResult": {
+        "type": "object",
+        "properties": {
+          "downloadMethod": {
+            "type": "string",
+            "description": "Currently fixed to GET"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Minimum 180 seconds"
+          }
+        }
+      },
+      "InstanceRenameRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        }
+      },
+      "InstanceRenameResult": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "InstanceItem": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "agentVersionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "agentTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired"
+            ]
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "InstanceListResult": {
+        "type": "object",
+        "properties": {
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstanceItem"
+            }
+          }
+        }
+      },
+      "StorageRenewRequest": {
+        "type": "object",
+        "required": [
+          "instanceId",
+          "renewMonths"
+        ],
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "renewMonths": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          }
+        }
+      },
+      "StorageRenewResult": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "instanceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Fixed paid on the Agent side"
+          },
+          "stripCheckoutUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Fixed null"
+          },
+          "purgeAtAfter": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Planned purge time after renewal"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "description": "= renewMonths x 2.00"
+          }
+        }
+      },
+      "SubscriptionCancelResult": {
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "canceled"
+            ]
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "Format yyyy-MM-dd"
+          }
+        }
+      },
+      "SubscriptionResumeResult": {
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active"
+            ]
+          },
+          "nextBillingDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "Format yyyy-MM-dd"
+          }
+        }
+      },
+      "SubscriptionItem": {
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "string"
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "agentVersionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "agentTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "retrying",
+              "canceled",
+              "expired"
+            ]
+          },
+          "cycle": {
+            "type": "string",
+            "nullable": true,
+            "description": "daily / weekly / monthly; unmapped values returned as-is"
+          },
+          "pricePerCycle": {
+            "type": "number",
+            "nullable": true
+          },
+          "nextBillingDate": {
+            "type": "string",
+            "nullable": true,
+            "description": "Format yyyy-MM-dd"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "nullable": true,
+            "description": "credit / stripe"
+          }
+        }
+      },
+      "SubscriptionListResult": {
+        "type": "object",
+        "properties": {
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionItem"
+            }
+          }
+        }
+      },
+      "SkillVersionItem": {
+        "type": "object",
+        "properties": {
+          "appVersionId": {
+            "type": "string",
+            "description": "Corresponds to agent_version_id"
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "agentType": {
+            "type": "string",
+            "description": "Fixed download"
+          },
+          "name": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "versionNo": {
+            "type": "integer"
+          },
+          "versionName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "shortDescription": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SkillInstall": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Temporary download URL (presigned or raw HTTP)"
+          }
+        }
+      },
+      "ThinSkillTemplate": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "thinSkillTemplateId": {
+            "type": "string"
+          },
+          "folderName": {
+            "type": "string"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      },
+      "OrderDownloadVO": {
+        "type": "object",
+        "properties": {
+          "skillInstall": {
+            "$ref": "#/components/schemas/SkillInstall"
+          },
+          "thinSkillTemplate": {
+            "$ref": "#/components/schemas/ThinSkillTemplate"
+          }
+        }
+      },
+      "ProfileResult": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ProfileUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "description": "Profile description; an empty string clears it"
+          }
+        }
+      },
+      "CreditInfo": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "number",
+            "description": "Credit balance"
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      },
+      "AutoConsumeInfo": {
+        "type": "object",
+        "properties": {
+          "monthlyLimit": {
+            "type": "number",
+            "nullable": true,
+            "description": "Monthly spend limit (USD)"
+          },
+          "perOrderLimit": {
+            "type": "number",
+            "nullable": true,
+            "description": "Per-order spend limit (USD)"
+          },
+          "monthlyUsed": {
+            "type": "number",
+            "description": "Amount spent this month (USD)"
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      },
+      "AccountAggregate": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "description": "Currently fixed to consumer"
+          },
+          "credit": {
+            "$ref": "#/components/schemas/CreditInfo"
+          },
+          "autoConsume": {
+            "$ref": "#/components/schemas/AutoConsumeInfo"
+          },
+          "developerVerified": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
