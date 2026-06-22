@@ -19,7 +19,7 @@ import {
   Zap, Target, BarChart3, Lightbulb, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Star, Package,
   Flame, Crown, Layers, PieChart as PieIcon, Sparkles, Shield,
-  Timer, Users, Activity, Globe, ShoppingCart, GraduationCap, Bot,
+  Timer, Users, Activity, Globe, ShoppingCart, Bot,
   GitCompare, ChevronRight, ExternalLink, Trophy, RefreshCw, Clock,
 } from 'lucide-react'
 import { RefreshProgress } from '@/components/refresh-progress'
@@ -163,7 +163,6 @@ function ScoreBadge({ score, label }: { score: number; label?: string }) {
 function PlatformIcon({ platform, className }: { platform: string; className?: string }) {
   switch (platform) {
     case 'gumroad': return <ShoppingCart className={className || "w-4 h-4"} />
-    case 'udemy': return <GraduationCap className={className || "w-4 h-4"} />
     case 'capafy': return <Bot className={className || "w-4 h-4"} />
     default: return <BarChart3 className={className || "w-4 h-4"} />
   }
@@ -171,7 +170,6 @@ function PlatformIcon({ platform, className }: { platform: string; className?: s
 
 const PLATFORM_CONFIG = {
   gumroad: { name: 'Gumroad', color: '#f97316', gradient: 'from-orange-500 to-amber-500', label: 'Dijital Urun', productLabel: 'Urun', salesLabel: 'Satis', api: '/api/market' },
-  udemy: { name: 'Udemy', color: '#8b5cf6', gradient: 'from-violet-500 to-purple-500', label: 'Online Kurs', productLabel: 'Kurs', salesLabel: 'Kayit', api: '/api/udemy' },
   capafy: { name: 'Capafy AI', color: '#06b6d4', gradient: 'from-cyan-500 to-teal-500', label: 'AI Skill', productLabel: 'Skill', salesLabel: 'Satis', api: '/api/capafy' },
 }
 
@@ -180,15 +178,15 @@ function safeNum(n: any, fallback: number = 0): number {
 }
 
 function getProductCount(c: any): number {
-  return safeNum(c.totalProducts || c.totalCourses)
+  return safeNum(c.totalProducts)
 }
 
 function getOverviewCount(overview: any): number {
-  return safeNum(overview?.totalProducts || overview?.totalCourses)
+  return safeNum(overview?.totalProducts)
 }
 
 // Shared sub-tabs for each marketplace
-function MarketplaceContent({ data, platform }: { data: PlatformData | null; platform: 'gumroad' | 'udemy' | 'capafy' }) {
+function MarketplaceContent({ data, platform }: { data: PlatformData | null; platform: 'gumroad' | 'capafy' }) {
   const config = PLATFORM_CONFIG[platform]
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [sortBy, setSortBy] = useState('revenue')
@@ -637,8 +635,8 @@ function MarketplaceContent({ data, platform }: { data: PlatformData | null; pla
 }
 
 export default function Home() {
-  const [activePlatform, setActivePlatform] = useState<'gumroad' | 'udemy' | 'capafy' | 'compare'>('gumroad')
-  const [platformData, setPlatformData] = useState<Record<string, PlatformData | null>>({ gumroad: null, udemy: null, capafy: null })
+  const [activePlatform, setActivePlatform] = useState<'gumroad' | 'capafy' | 'compare'>('gumroad')
+  const [platformData, setPlatformData] = useState<Record<string, PlatformData | null>>({ gumroad: null, capafy: null })
   const [compareData, setCompareData] = useState<CompareData | null>(null)
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -648,21 +646,20 @@ export default function Home() {
   // Fetch platform data
   async function fetchPlatformData() {
     try {
-      const [gumroad, udemy, capafy] = await Promise.all([
+      const [gumroad, capafy] = await Promise.all([
         fetch('/api/market').then(r => r.json()).catch(() => null),
-        fetch('/api/udemy').then(r => r.json()).catch(() => null),
         fetch('/api/capafy').then(r => r.json()).catch(() => null),
       ])
-      setPlatformData({ gumroad, udemy, capafy })
+      setPlatformData({ gumroad, capafy })
       // Get latest timestamp from any platform
-      const ts = gumroad?.lastUpdated || udemy?.lastUpdated || capafy?.lastUpdated
+      const ts = gumroad?.lastUpdated || capafy?.lastUpdated
       if (ts) setLastUpdated(ts)
     } catch (e) {
       console.error('Fetch error:', e)
     }
   }
 
-  // Manuel refresh
+  // Manuel refresh - SSE benzeri polling ile jobId bazli bekleme
   async function handleRefresh() {
     setIsRefreshing(true)
     try {
@@ -670,8 +667,7 @@ export default function Home() {
       const rp = (window as any).__refreshProgress
       if (rp) {
         rp.updatePlatformStatus('gumroad', 'loading')
-        setTimeout(() => rp.updatePlatformStatus('udemy', 'loading'), 2000)
-        setTimeout(() => rp.updatePlatformStatus('capafy', 'loading'), 4000)
+        setTimeout(() => rp.updatePlatformStatus('capafy', 'loading'), 1500)
       }
 
       const res = await fetch('/api/refresh', {
@@ -680,42 +676,75 @@ export default function Home() {
         body: JSON.stringify({}),
       })
       const data = await res.json()
-      
-      // Platform sonuclarina gore status guncelle
-      if (data.results) {
+
+      if (res.status === 409) {
+        // Zaten calisan job var - mevcut jobId ile poll et
+        const jobId = data.job?.id
+        if (jobId) {
+          await pollRefreshJob(jobId)
+        }
+      } else if (data.status === 'started' && data.jobId) {
+        // Yeni job baslatildi - poll ile bekle
+        await pollRefreshJob(data.jobId)
+      } else if (data.results) {
+        // Eski davranis (immediate response)
         data.results.forEach((r: any) => {
           if (rp) rp.updatePlatformStatus(r.platform, r.status === 'success' ? 'success' : 'error')
         })
+        await fetchPlatformData()
       }
 
-      if (data.status === 'success' || data.status === 'partial' || data.status === 'started') {
-        // Islemi baslatti - verileri guncelle
-        if (data.status !== 'started') {
-          await fetchPlatformData()
-        } else {
-          // Background refresh basladi, 5sn sonra verileri tazele
-          setTimeout(async () => {
-            await fetchPlatformData()
-            if (activePlatform === 'compare') {
-              fetch('/api/compare').then(r => r.json()).then(setCompareData).catch(() => {})
-            }
-          }, 5000)
-        }
-        if (activePlatform === 'compare') {
-          fetch('/api/compare').then(r => r.json()).then(setCompareData).catch(() => {})
-        }
-        toast({
-          title: 'Veriler Guncelleniyor',
-          description: 'Platform verileri arka planda yenileniyor...',
-        })
-      } else {
-        toast({ title: 'Hata', description: 'Veri yenileme basarisiz', variant: 'destructive' })
+      if (activePlatform === 'compare') {
+        fetch('/api/compare').then(r => r.json()).then(setCompareData).catch(() => {})
       }
+      toast({
+        title: 'Veriler Guncelleniyor',
+        description: 'Platform verileri arka planda yenileniyor...',
+      })
     } catch (e) {
       toast({ title: 'Hata', description: 'Sunucu hatasi', variant: 'destructive' })
     } finally {
       setTimeout(() => setIsRefreshing(false), 500)
     }
+  }
+
+  /**
+   * JobId bazli polling - refresh tamamlanana kadar bekle, sonra UI guncelle.
+   * Sabit timeout yerine gercek job durumunu bekler (H6 fix).
+   */
+  async function pollRefreshJob(jobId: string, maxWaitMs: number = 180000) {
+    const pollIntervalMs = 2000
+    const startedAt = Date.now()
+    const rp = (window as any).__refreshProgress
+
+    while (Date.now() - startedAt < maxWaitMs) {
+      try {
+        const res = await fetch(`/api/refresh?jobId=${encodeURIComponent(jobId)}`)
+        if (res.ok) {
+          const status = await res.json()
+          if (status.job?.status === 'success') {
+            // Platform bazli durumu guncelle
+            if (rp && status.results) {
+              status.results.forEach((r: any) => {
+                rp.updatePlatformStatus(r.platform, r.status === 'success' ? 'success' : 'error')
+              })
+            }
+            await fetchPlatformData()
+            return
+          }
+          if (status.job?.status === 'error') {
+            toast({ title: 'Hata', description: status.job.message || 'Yenileme basarisiz', variant: 'destructive' })
+            return
+          }
+        }
+      } catch (e) {
+        console.error('Poll hatasi:', e)
+      }
+      await new Promise((r) => setTimeout(r, pollIntervalMs))
+    }
+
+    // Timeout - yine de UI guncellemeyi dene
+    await fetchPlatformData()
   }
 
   // Initial data load - sadece mevcut veriyi yukle, refresh YAPMA
@@ -763,7 +792,7 @@ export default function Home() {
                 <h1 className="text-base sm:text-xl font-bold tracking-tight bg-gradient-to-r from-orange-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent">
                   Multi-Pazar Analiz Pro
                 </h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Gumroad + Udemy + Capafy AI | 3 Pazaryeri Karsilastirmali Analiz</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Gumroad + Capafy AI | 2 Pazaryeri Karsilastirmali Analiz</p>
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
@@ -798,36 +827,35 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Platform Selector */}
-        <Tabs value={activePlatform} onValueChange={(v) => setActivePlatform(v as any)} className="space-y-6">
-          <TabsList className="bg-white border shadow-sm h-auto p-1 sm:p-1.5 flex-wrap gap-1">
-            {[
-              { value: 'gumroad', label: 'Gumroad', sublabel: 'Dijital Urun', icon: ShoppingCart, color: 'bg-orange-500' },
-              { value: 'udemy', label: 'Udemy', sublabel: 'Online Kurs', icon: GraduationCap, color: 'bg-violet-500' },
-              { value: 'capafy', label: 'Capafy AI', sublabel: 'AI Skill', icon: Bot, color: 'bg-cyan-500' },
-              { value: 'compare', label: 'Karsilastirma', sublabel: '3 Platform', icon: GitCompare, color: 'bg-gradient-to-r from-orange-500 via-violet-500 to-cyan-500' },
-            ].map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value}
-                className={`gap-1.5 sm:gap-2 px-2.5 sm:px-5 py-2 sm:py-2.5 text-[11px] sm:text-sm rounded-lg transition-all ${activePlatform === tab.value ? 'text-white shadow-md' : 'hover:bg-muted/50'}`}
-                style={activePlatform === tab.value ? {
-                  backgroundColor: tab.value === 'compare' ? undefined : tab.value === 'gumroad' ? '#f97316' : tab.value === 'udemy' ? '#8b5cf6' : '#06b6d4',
-                  backgroundImage: tab.value === 'compare' ? 'linear-gradient(to right, #f97316, #8b5cf6, #06b6d4)' : undefined,
-                } : undefined}>
-                <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <div className="text-left">
-                  <div className="font-semibold text-[11px] sm:text-sm leading-tight">{tab.label}</div>
-                  <div className="text-[9px] sm:text-[10px] opacity-70 leading-tight">{tab.sublabel}</div>
-                </div>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          {/* Platform Selector */}
+          <Tabs value={activePlatform} onValueChange={(v) => setActivePlatform(v as any)} className="space-y-6">
+            <TabsList className="bg-white border shadow-sm h-auto p-1 sm:p-1.5 flex-wrap gap-1">
+              {[
+                { value: 'gumroad', label: 'Gumroad', sublabel: 'Dijital Urun', icon: ShoppingCart, color: 'bg-orange-500' },
+                { value: 'capafy', label: 'Capafy AI', sublabel: 'AI Skill', icon: Bot, color: 'bg-cyan-500' },
+                { value: 'compare', label: 'Karsilastirma', sublabel: '2 Platform', icon: GitCompare, color: 'bg-gradient-to-r from-orange-500 via-cyan-500' },
+              ].map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}
+                  className={`gap-1.5 sm:gap-2 px-2.5 sm:px-5 py-2 sm:py-2.5 text-[11px] sm:text-sm rounded-lg transition-all ${activePlatform === tab.value ? 'text-white shadow-md' : 'hover:bg-muted/50'}`}
+                  style={activePlatform === tab.value ? {
+                    backgroundColor: tab.value === 'compare' ? undefined : tab.value === 'gumroad' ? '#f97316' : '#06b6d4',
+                    backgroundImage: tab.value === 'compare' ? 'linear-gradient(to right, #f97316, #06b6d4)' : undefined,
+                  } : undefined}>
+                  <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <div className="text-left">
+                    <div className="font-semibold text-[11px] sm:text-sm leading-tight">{tab.label}</div>
+                    <div className="text-[9px] sm:text-[10px] opacity-70 leading-tight">{tab.sublabel}</div>
+                  </div>
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
           {/* Marketplace Content */}
           {activePlatform !== 'compare' && (
             <MarketplaceContent
               key={activePlatform}
               data={platformData[activePlatform]}
-              platform={activePlatform as 'gumroad' | 'udemy' | 'capafy'}
+              platform={activePlatform as 'gumroad' | 'capafy'}
             />
           )}
 
@@ -874,7 +902,7 @@ export default function Home() {
                 <CardHeader className="pb-1.5 sm:pb-2">
                   <div className="flex items-center justify-between">
                     <div><CardTitle className="text-sm sm:text-base font-semibold">Platform Karsilastirma Radari</CardTitle><CardDescription className="text-[10px] sm:text-xs">Buyume, talep, rekabet, fiyat ve komisyon karsilastirmasi</CardDescription></div>
-                    <GitCompare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
+                    <GitCompare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -883,15 +911,13 @@ export default function Home() {
                       <RadarChart cx="50%" cy="50%" outerRadius="70%" data={compareData.comparisonMetrics.map(m => ({
                         metric: m.metric,
                         Gumroad: m.gumroad,
-                        Udemy: m.udemy,
                         'Capafy AI': m.capafy,
                       }))}>
                         <PolarGrid stroke="#e5e7eb" />
                         <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
                         <PolarRadiusAxis tick={{ fontSize: 9 }} />
-                        <Radar name="Gumroad" dataKey="Gumroad" stroke="#f97316" fill="#f97316" fillOpacity={0.1} strokeWidth={2} />
-                        <Radar name="Udemy" dataKey="Udemy" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.1} strokeWidth={2} />
-                        <Radar name="Capafy AI" dataKey="Capafy AI" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.1} strokeWidth={2} />
+                        <Radar name="Gumroad" dataKey="Gumroad" stroke="#f97316" fill="#f97316" fillOpacity={0.2} strokeWidth={2} />
+                        <Radar name="Capafy AI" dataKey="Capafy AI" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.2} strokeWidth={2} />
                         <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                       </RadarChart>
@@ -904,7 +930,7 @@ export default function Home() {
               <Card className="border-0 shadow-md shadow-black/5">
                 <CardHeader className="pb-1.5 sm:pb-2">
                   <div className="flex items-center justify-between">
-                    <div><CardTitle className="text-sm sm:text-base font-semibold">Capraz Pazar Firsatlari</CardTitle><CardDescription className="text-[10px] sm:text-xs">3 platformda da guclu talep goren konular</CardDescription></div>
+                    <div><CardTitle className="text-sm sm:text-base font-semibold">Capraz Pazar Firsatlari</CardTitle><CardDescription className="text-[10px] sm:text-xs">2 platformda da guclu talep goren konular</CardDescription></div>
                     <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
                   </div>
                 </CardHeader>
@@ -915,39 +941,34 @@ export default function Home() {
                         <div key={`cross-${i}`} className="p-3 sm:p-4 rounded-xl border hover:shadow-md transition-all">
                           <div className="flex items-center justify-between mb-2 sm:mb-3 gap-2">
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-orange-500 to-violet-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">{i + 1}</div>
+                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-orange-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">{i + 1}</div>
                               <h3 className="font-semibold text-xs sm:text-sm">{opp.theme}</h3>
                             </div>
                             <Badge variant="secondary" className="text-[10px] sm:text-xs bg-emerald-50 text-emerald-700 whitespace-nowrap">{opp.bestPlatform}</Badge>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-3">
                             {/* Gumroad */}
                             <div className="p-2.5 rounded-lg border-l-4" style={{ borderColor: '#f97316' }}>
                               <div className="flex items-center gap-1 mb-1"><ShoppingCart className="w-3 h-3 text-orange-500" /><span className="text-[10px] font-semibold text-orange-600">Gumroad</span></div>
-                              <div className="text-xs font-medium">{opp.gumroad.category}</div>
-                              <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-                                <span>Talep: {opp.gumroad.demand}</span>
-                                <span>Buyume: +{opp.gumroad.growth}%</span>
-                              </div>
-                            </div>
-                            {/* Udemy */}
-                            <div className="p-2.5 rounded-lg border-l-4" style={{ borderColor: '#8b5cf6' }}>
-                              <div className="flex items-center gap-1 mb-1"><GraduationCap className="w-3 h-3 text-violet-500" /><span className="text-[10px] font-semibold text-violet-600">Udemy</span></div>
-                              <div className="text-xs font-medium">{opp.udemy.category}</div>
-                              <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-                                <span>Talep: {opp.udemy.demand}</span>
-                                <span>Buyume: +{opp.udemy.growth}%</span>
-                              </div>
+                              <div className="text-xs font-medium">{opp.gumroad?.category || '-'}</div>
+                              {opp.gumroad && (
+                                <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                                  <span>Talep: {opp.gumroad.demand}</span>
+                                  <span>Buyume: +{opp.gumroad.growth}%</span>
+                                </div>
+                              )}
                             </div>
                             {/* Capafy */}
                             <div className="p-2.5 rounded-lg border-l-4" style={{ borderColor: '#06b6d4' }}>
-                              <div className="flex items-center gap-1 mb-1"><Bot className="w-3 h-3 text-cyan-500" /><span className="text-[10px] font-semibold text-cyan-600">Capafy AI</span></div>
-                              <div className="text-xs font-medium">{opp.capafy.category}</div>
-                              <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-                                <span>Talep: {opp.capafy.demand}</span>
-                                <span>Buyume: +{opp.capafy.growth}%</span>
-                              </div>
+                              <div className="flex items-center gap-1 mb-1"><Bot className="w-3 h-3 text-cyan-500" /><span className="text-[10px] font-semibold text-cyan-600">Capafy</span></div>
+                              <div className="text-xs font-medium">{opp.capafy?.category || '-'}</div>
+                              {opp.capafy && (
+                                <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                                  <span>Talep: {opp.capafy.demand}</span>
+                                  <span>Buyume: +{opp.capafy.growth}%</span>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -963,7 +984,7 @@ export default function Home() {
               </Card>
 
               {/* Platform Strengths */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
                 {compareData.platformStrengths.map((ps: any, i: number) => (
                   <Card key={`strength-${i}`} className="border-0 shadow-md shadow-black/5">
                     <CardHeader className="pb-1.5 sm:pb-2">
@@ -1010,7 +1031,7 @@ export default function Home() {
               <span className="font-medium">Multi-Pazar Analiz Pro</span>
             </div>
             <div className="text-[11px] sm:text-xs text-muted-foreground text-center">
-              Gumroad + Udemy + Capafy AI | Gercek Pazar Verileri | Karsilastirmali Analiz
+              Gumroad + Capafy AI | Gercek Pazar Verileri | Karsilastirmali Analiz
             </div>
             {lastUpdated && (
               <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
@@ -1022,7 +1043,6 @@ export default function Home() {
             )}
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
               <Badge variant="outline" className="text-orange-600 border-orange-200 text-[10px] sm:text-xs"><ShoppingCart className="w-3 h-3 mr-1" />Gumroad</Badge>
-              <Badge variant="outline" className="text-violet-600 border-violet-200 text-[10px] sm:text-xs"><GraduationCap className="w-3 h-3 mr-1" />Udemy</Badge>
               <Badge variant="outline" className="text-cyan-600 border-cyan-200 text-[10px] sm:text-xs"><Bot className="w-3 h-3 mr-1" />Capafy AI</Badge>
             </div>
           </div>

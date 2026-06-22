@@ -1,5 +1,6 @@
 import cron from 'node-cron'
 import { refreshAllPlatforms } from '@/lib/refresh'
+import { purgeExpiredEntries } from '@/lib/cache'
 
 let isRunning = false
 
@@ -20,14 +21,9 @@ export function startCronJob() {
 
   // Her 30 dakikada bir cache temizle (API cache'leri yenilensin)
   cron.schedule('*/30 * * * *', () => {
-    // Cache temizleme - global cache Map'i temizle
-    const globalCache = globalThis as unknown as {
-      refreshCache?: Map<string, { data: unknown; timestamp: number }>
-    }
-    if (globalCache.refreshCache) {
-      const oldSize = globalCache.refreshCache.size
-      globalCache.refreshCache.clear()
-      console.log(`[Cron] API cache temizlendi (${oldSize} entry)`)
+    const purged = purgeExpiredEntries()
+    if (purged > 0) {
+      console.log(`[Cron] Sureli dolmus ${purged} cache entry temizlendi`)
     }
   })
 

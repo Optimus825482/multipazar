@@ -1,4 +1,4 @@
-import { BarChart3, Clock, ShoppingCart, GraduationCap, Bot } from 'lucide-react'
+import { BarChart3, Clock, ShoppingCart, Bot } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 interface FooterProps {
@@ -15,7 +15,7 @@ export function Footer({ lastUpdated }: FooterProps) {
             <span className="font-medium">Multi-Pazar Analiz Pro</span>
           </div>
           <div className="text-[11px] sm:text-xs text-muted-foreground text-center">
-            Gumroad + Udemy + Capafy AI | Gercek Pazar Verileri | Karsilastirmali Analiz
+            Gumroad + Capafy AI | Gercek Pazar Verileri | Karsilastirmali Analiz
           </div>
           {lastUpdated && (
             <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
@@ -27,7 +27,6 @@ export function Footer({ lastUpdated }: FooterProps) {
           )}
           <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
             <Badge variant="outline" className="text-orange-600 border-orange-200 text-[10px] sm:text-xs"><ShoppingCart className="w-3 h-3 mr-1" />Gumroad</Badge>
-            <Badge variant="outline" className="text-violet-600 border-violet-200 text-[10px] sm:text-xs"><GraduationCap className="w-3 h-3 mr-1" />Udemy</Badge>
             <Badge variant="outline" className="text-cyan-600 border-cyan-200 text-[10px] sm:text-xs"><Bot className="w-3 h-3 mr-1" />Capafy AI</Badge>
           </div>
         </div>

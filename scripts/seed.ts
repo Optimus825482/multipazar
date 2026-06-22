@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 const db = new PrismaClient()
 
 async function main() {
-  console.log("Seeding database for PostgreSQL...")
+  console.log("Seeding database for SQLite...")
 
   // Temizlik
   await db.productIdea.deleteMany()
@@ -50,31 +50,8 @@ async function main() {
   console.log(`  Created 2 insights`)
 
   // ===================== UDEMY =====================
-  console.log("--- Seeding Udemy ---")
-
-  const udemyCategories = [
-    { name: "Yazilim Gelistirme", slug: "software-development", description: "Web, mobil, backend, full-stack kurslari", icon: "Code", color: "#10b981", avgPrice: 89.00, totalProducts: 185000, totalCourses: 185000, totalRevenue: 1850000000, totalStudents: 42000000, searchVolume: 3200000, demandScore: 9.7, supplyScore: 8.5, competitionIndex: 7.8, growthRate: 22.4, trendDirection: "up", avgRating: 4.5, avgReviews: 3200, source: "ClassCentral 2025" },
-    { name: "Veri Bilimi & AI/ML", slug: "data-science-ai", description: "Machine learning, deep learning, veri analizi", icon: "Brain", color: "#8b5cf6", avgPrice: 94.00, totalProducts: 68000, totalCourses: 68000, totalRevenue: 980000000, totalStudents: 18500000, searchVolume: 2800000, demandScore: 9.8, supplyScore: 6.2, competitionIndex: 4.5, growthRate: 45.2, trendDirection: "up", avgRating: 4.4, avgReviews: 2800, source: "Udemy Business Report 2025" },
-    { name: "IT & Sertifika", slug: "it-certifications", description: "AWS, Azure, Google Cloud sertifikalari", icon: "Shield", color: "#f97316", avgPrice: 109.00, totalProducts: 42000, totalCourses: 42000, totalRevenue: 720000000, totalStudents: 15000000, searchVolume: 1900000, demandScore: 9.2, supplyScore: 5.8, competitionIndex: 4.2, growthRate: 28.6, trendDirection: "up", avgRating: 4.5, avgReviews: 3400, source: "Global Knowledge IT Skills" },
-  ]
-
-  const udemySlugToId: Record<string, string> = {}
-  for (const cat of udemyCategories) {
-    const created = await db.category.create({ data: { platform: 'udemy', ...cat } })
-    udemySlugToId[cat.slug] = created.id
-  }
-  console.log(`  Created ${udemyCategories.length} categories`)
-
-  const udemyCourses = [
-    { name: "100 Days of Code: Python", slug: "software-development", instructor: "Dr. Angela Yu", price: 84.99, studentCount: 1250000, rating: 4.7, reviewCount: 98000, demandScore: 9.8, supplyScore: 6.5, tags: "python,bootcamp", avgMonthlyEnroll: 42000, isTrending: true },
-    { name: "Machine Learning A-Z", slug: "data-science-ai", instructor: "Kirill Eremenko", price: 94.99, studentCount: 1150000, rating: 4.5, reviewCount: 120000, demandScore: 9.7, supplyScore: 5.8, tags: "machine-learning,ai", avgMonthlyEnroll: 28000, isTrending: true },
-  ]
-  for (const c of udemyCourses) {
-    await db.product.create({
-      data: { platform: 'udemy', name: c.name, categoryId: udemySlugToId[c.slug]!, price: c.price, salesCount: c.studentCount, studentCount: c.studentCount, revenue: Math.round(c.price * c.studentCount * 0.15), rating: c.rating, reviewCount: c.reviewCount, demandScore: c.demandScore, supplyScore: c.supplyScore, opportunityScore: Math.max(0, Math.round((c.demandScore * 10 - c.supplyScore * 8) * 10) / 10), tags: c.tags, type: 'course', avgMonthlyEnroll: c.avgMonthlyEnroll, isTrending: c.isTrending, instructor: c.instructor },
-    })
-  }
-  console.log(`  Created ${udemyCourses.length} courses`)
+  // Udemy artik desteklenmiyor (ToS riski + Puppeteer maliyeti).
+  // Sadece Gumroad + Capafy AI pazar verileri kullaniliyor.
 
   // ===================== CAPAFY =====================
   console.log("--- Seeding Capafy ---")

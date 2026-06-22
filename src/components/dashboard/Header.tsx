@@ -20,10 +20,10 @@ export function Header({ isRefreshing, lastUpdated, onRefresh }: HeaderProps) {
                 <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-base sm:text-xl font-bold tracking-tight bg-gradient-to-r from-orange-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent">
+                <h1 className="text-base sm:text-xl font-bold tracking-tight bg-gradient-to-r from-orange-600 via-cyan-600 to-emerald-600 bg-clip-text text-transparent">
                   Multi-Pazar Analiz Pro
                 </h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Gumroad + Udemy + Capafy AI | 3 Pazaryeri Karsilastirmali Analiz</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Gumroad + Capafy AI | 2 Pazaryeri Karsilastirmali Analiz</p>
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
@@ -31,7 +31,7 @@ export function Header({ isRefreshing, lastUpdated, onRefresh }: HeaderProps) {
                 <Activity className="w-3 h-3" />Canli Veriler
               </Badge>
               <Badge variant="secondary" className="flex sm:flex items-center gap-1 text-[10px] sm:text-xs">
-                <Globe className="w-3 h-3" />3 Pazar
+                <Globe className="w-3 h-3" />2 Pazar
               </Badge>
               {/* Son Guncelleme Zamani */}
               {lastUpdated && (

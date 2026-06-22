@@ -1,6 +1,5 @@
 import { db } from '@/lib/db'
 import { fetchMultipleTrends, getSearchTermsForCategory, TrendResult } from './trends'
-import { fetchAllUdemyCategories, UdemyCategoryData } from './udemy'
 import { fetchAllCapafyCategories, CapafyCategoryData } from './capafy'
 import { fetchAllGumroadCategories, GumroadCategoryData } from './gumroad'
 import {
@@ -12,7 +11,7 @@ import {
   CategoryStats,
 } from './scoring'
 
-export type Platform = 'gumroad' | 'udemy' | 'capafy'
+export type Platform = 'gumroad' | 'capafy'
 
 /**
  * Kategori config - her platformun kategori listesi
@@ -31,20 +30,6 @@ const PLATFORM_CATEGORIES: Record<Platform, { name: string; slug: string; descri
     { name: 'Yazarlik ve Yayincilik', slug: 'writing-publishing', description: 'E-kitap sablonlari, writing guide ve araclari', icon: 'BookOpen', color: '#78716c' },
     { name: 'Pazarlama SEO', slug: 'marketing-seo', description: 'Pazarlama sablonlari, SEO araclari ve kitleri', icon: 'TrendingUp', color: '#06b6d4' },
     { name: 'Kisisel Gelisim', slug: 'self-development', description: 'Kisisel gelisim kaynaklari, productivity guide', icon: 'UserPlus', color: '#84cc16' },
-  ],
-  udemy: [
-    { name: 'Yazilim Gelistirme', slug: 'software-development', description: 'Web, mobil, backend, full-stack, DevOps kurslari', icon: 'Code', color: '#10b981' },
-    { name: 'Veri Bilimi & AI/ML', slug: 'data-science-ai', description: 'Machine learning, deep learning, veri analizi', icon: 'Brain', color: '#8b5cf6' },
-    { name: 'Is ve Girisimcilik', slug: 'business', description: 'Is yonetimi, girisimcilik, liderlik', icon: 'Briefcase', color: '#3b82f6' },
-    { name: 'IT Sertifika', slug: 'it-certification', description: 'AWS, Azure, DevOps, network sertifika kurslari', icon: 'Shield', color: '#ef4444' },
-    { name: 'Tasarim', slug: 'design', description: 'UI/UX, grafik tasarim, 3D modelleme', icon: 'Palette', color: '#ec4899' },
-    { name: 'Pazarlama', slug: 'marketing', description: 'Dijital pazarlama, SEO, sosyal medya', icon: 'TrendingUp', color: '#06b6d4' },
-    { name: 'Kisisel Gelisim', slug: 'personal-development', description: 'Liderlik, iletisim, zaman yonetimi', icon: 'UserPlus', color: '#84cc16' },
-    { name: 'Fotograf Video', slug: 'photography', description: 'Fotografcilik, video editing, post-production', icon: 'Camera', color: '#f59e0b' },
-    { name: 'Saglik ve Fitness', slug: 'health-fitness', description: 'Fitness, beslenme, meditasyon', icon: 'Heart', color: '#f97316' },
-    { name: 'Muzik', slug: 'music', description: 'Muzik prodüksiyon, enstruman, ses muhendisligi', icon: 'Music', color: '#14b8a6' },
-    { name: 'Dil Ogrenimi', slug: 'language', description: 'Ingilizce, Ispanyolca, Almanca ve diger diller', icon: 'Languages', color: '#6366f1' },
-    { name: 'Akademik', slug: 'academic', description: 'Akademik yazim, arastirma yontemleri, tez hazirlama', icon: 'GraduationCap', color: '#78716c' },
   ],
   capafy: [
     { name: 'Prompt Muhendisligi', slug: 'prompt-engineering', description: 'ChatGPT, Claude, Midjourney prompt gelistirme', icon: 'Sparkles', color: '#8b5cf6' },
@@ -67,7 +52,6 @@ const PLATFORM_CATEGORIES: Record<Platform, { name: string; slug: string; descri
  */
 const PLATFORM_SOURCE: Record<Platform, string> = {
   gumroad: 'Gumroad Inertia API + Google Trends',
-  udemy: 'Udemy Scraping + Google Trends',
   capafy: 'Capafy Scraping + Google Trends',
 }
 
@@ -134,32 +118,6 @@ async function fetchPlatformCategories(platform: Platform, slugs: string[]): Pro
         })),
       })
     }
-  } else if (platform === 'udemy') {
-    const data = await fetchAllUdemyCategories(slugs)
-    for (const [, cat] of data) {
-      results.set(cat.slug, {
-        slug: cat.slug,
-        totalProducts: cat.totalCourses,
-        avgPrice: cat.avgPrice,
-        avgRating: cat.avgRating,
-        avgReviews: cat.avgReviews,
-        products: cat.courses.map((c) => ({
-          name: c.name,
-          price: c.price,
-          rating: c.rating,
-          reviewCount: c.reviewCount,
-          salesCount: c.studentCount,
-          studentCount: c.studentCount,
-          tags: c.tags,
-          isTrending: c.isTrending,
-          instructor: c.instructor,
-          url: c.url,
-          avgMonthlyEnroll: c.avgMonthlyEnroll,
-          demandScore: c.demandScore,
-          supplyScore: c.supplyScore,
-        })),
-      })
-    }
   } else {
     const data = await fetchAllCapafyCategories(slugs)
     for (const [, cat] of data) {
@@ -194,8 +152,9 @@ async function fetchPlatformCategories(platform: Platform, slugs: string[]): Pro
  * Platforma ozel default degerler - uydurma degil, makul minimum varsayimlar.
  * Gercek veri olmadiginda kategori ATLANIR, uydurma veri uretilmez.
  */
-function getProductType(platform: Platform): string {
-  return platform === 'udemy' ? 'course' : 'other'
+function getProductType(_platform: Platform): string {
+  // Tum platformlar icin 'other' (Udemy artik desteklenmiyor)
+  return 'other'
 }
 
 function getPriceRange(price: number): string {
@@ -252,7 +211,7 @@ async function refreshPlatformData(platform: Platform): Promise<void> {
     const avgReviews = scraped?.avgReviews ?? 0
     const searchVolume = trend?.avgVolume ?? 0
     const growthRate = trend?.growthRate ?? 0
-    const totalStudents = scraped?.totalStudents ?? (platform === 'udemy' ? totalProducts * 500 : 0)
+    const totalStudents = scraped?.totalStudents ?? 0
 
     // Gelir hesabi: GERCEK urun verisi varsa urun fiyat * satis uzerinden.
     // Uydurma carpan (*30, *50) KALDIRILDI.
@@ -415,14 +374,14 @@ function buildInsights(
   if (top && top.searchVolume > 0) {
     const second = sortedByVolume[1]
     const ratio = second && second.searchVolume > 0 ? top.searchVolume / second.searchVolume : 1
-    insights.push({
-      platform,
-      title: `${platform === 'udemy' ? 'Kurs' : 'Urun'} Talebi En Yuksek Kategori`,
-      description: `Toplam ${top.searchVolume.toLocaleString()} aylik arama hacmi ile en cok talep goren kategori. Bu kategorideki talep digerlerinden %${Math.round((ratio - 1) * 100)} daha yuksek.`,
-      insightType: 'opportunity',
-      impactScore: Math.min(10, Math.round(ratio * 5 * 10) / 10),
-      source: 'Google Trends + Platform Verileri',
-    })
+      insights.push({
+        platform,
+        title: `Urun Talebi En Yuksek Kategori`,
+        description: `Toplam ${top.searchVolume.toLocaleString()} aylik arama hacmi ile en cok talep goren kategori. Bu kategorideki talep digerlerinden %${Math.round((ratio - 1) * 100)} daha yuksek.`,
+        insightType: 'opportunity',
+        impactScore: Math.min(10, Math.round(ratio * 5 * 10) / 10),
+        source: 'Google Trends + Platform Verileri',
+      })
   }
 
   // Buyume orani analizi
@@ -533,7 +492,7 @@ export async function refreshAllPlatforms(): Promise<{ platform: Platform; statu
 
   // ADR: Platformlar SIRAYLA calisir (paralel degil) - SQLite yazma kilidini onlemek icin
   const results: { platform: Platform; status: 'success' | 'error'; duration: number; message: string }[] = []
-  for (const platform of ['gumroad', 'udemy', 'capafy'] as Platform[]) {
+  for (const platform of ['gumroad', 'capafy'] as Platform[]) {
     results.push(await refreshPlatform(platform))
   }
 
@@ -544,7 +503,7 @@ export async function refreshAllPlatforms(): Promise<{ platform: Platform; statu
       status: allSuccess ? 'success' : 'error',
       duration: results.reduce((s, r) => s + r.duration, 0),
       message: allSuccess
-        ? '3 platform da basariyla guncellendi (Google Trends + Scraping)'
+        ? '2 platform da basariyla guncellendi (Google Trends + Scraping)'
         : `Bazi platformlarda hata: ${results.filter((r) => r.status === 'error').map((r) => r.platform).join(', ')}`,
     },
   })
@@ -553,4 +512,4 @@ export async function refreshAllPlatforms(): Promise<{ platform: Platform; statu
 }
 
 // Geriye donuk uyumluluk: eski importlari kiran tip export'lari
-export type { GumroadCategoryData, UdemyCategoryData, CapafyCategoryData, TrendResult }
+export type { GumroadCategoryData, CapafyCategoryData, TrendResult }

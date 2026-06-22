@@ -2,25 +2,13 @@ import { NextResponse } from 'next/server'
 import { getPlatformDataFromDB, buildTrendDataFromDB } from '@/data/helpers'
 import { CAPAFY_PRODUCT_IDEAS, CAPAFY_DATA_SOURCES } from '@/data/capafy/product-ideas'
 import { db } from '@/lib/db'
+import { cachedFetch, setCached } from '@/lib/cache'
 
-const cache = new Map<string, { data: unknown; timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000
-
-function getCached(key: string) {
-  const entry = cache.get(key)
-  if (entry && Date.now() - entry.timestamp < CACHE_DURATION) return entry.data
-  return null
-}
-function setCache(key: string, data: unknown) {
-  cache.set(key, { data, timestamp: Date.now() })
-}
-
-const globalCache = globalThis as unknown as { refreshCache?: Map<string, { data: unknown; timestamp: number }> }
-if (!globalCache.refreshCache) globalCache.refreshCache = cache as any
 
 export async function GET() {
   try {
-    const cached = getCached('capafy-data-db')
+    const cached = cachedFetch('capafy-data-db')
     if (cached) return NextResponse.json(cached)
 
     const {
@@ -93,7 +81,7 @@ export async function GET() {
       lastUpdated: lastRefreshLog?.createdAt?.toISOString() || new Date().toISOString(),
     }
 
-    setCache('capafy-data-db', result)
+    setCached('capafy-data-db', result, CACHE_DURATION)
     return NextResponse.json(result)
   } catch (error) {
     console.error('Capafy API error:', error)

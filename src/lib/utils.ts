@@ -46,6 +46,5 @@ export interface PlatformConfig {
 
 export const PLATFORM_CONFIG: Record<string, PlatformConfig> = {
   gumroad: { name: 'Gumroad', color: '#f97316', gradient: 'from-orange-500 to-amber-500', label: 'Dijital Urun', productLabel: 'Urun', salesLabel: 'Satis', api: '/api/market' },
-  udemy: { name: 'Udemy', color: '#8b5cf6', gradient: 'from-violet-500 to-purple-500', label: 'Online Kurs', productLabel: 'Kurs', salesLabel: 'Kayit', api: '/api/udemy' },
   capafy: { name: 'Capafy AI', color: '#06b6d4', gradient: 'from-cyan-500 to-teal-500', label: 'AI Skill', productLabel: 'Skill', salesLabel: 'Satis', api: '/api/capafy' },
 }

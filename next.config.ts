@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   reactStrictMode: true,
-  // Guvenlik basliklari
+  // Guvenlik basliklari (CSP eklendi - XSS korumasi)
   async headers() {
     return [
       {
@@ -18,6 +18,26 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-DNS-Prefetch-Control", value: "on" },
+          // Content Security Policy - inline style/scripts Next.js icin gerekli;
+          // unsafe-eval sadece dev icin. Production'da ek sıkılastırma yapılabilir.
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js dev/prod gereksinimi
+              "style-src 'self' 'unsafe-inline'", // Tailwind + inline style
+              "img-src 'self' data: https:", // logo + data URL'ler
+              "font-src 'self' data:",
+              "connect-src 'self' https://trends.google.com https://api.capafy.ai https://gumroad.com", // scraper upstream'ler
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join("; "),
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
         ],
       },
     ];

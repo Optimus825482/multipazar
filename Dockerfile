@@ -1,5 +1,5 @@
 # ---- Multi-stage Build ----
-# Tek container: Next.js + SQLite
+# Tek container: Next.js + SQLite (Udemy/Puppeteer kaldirildi)
 
 # ---- Stage 1: Builder ----
 FROM oven/bun:1 AS builder
@@ -7,7 +7,6 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 COPY package.json bun.lock ./
-ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN bun install
 
 COPY . .
@@ -18,27 +17,27 @@ RUN bun run build
 # ---- Stage 2: Runtime ----
 FROM oven/bun:1-slim AS runner
 
-# Puppeteer / Chromium icin gerekli bagimliliklar
-RUN apt-get update && apt-get install -y chromium --no-install-recommends && rm -rf /var/lib/apt/lists/*
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-
+# Guvenlik: Root olarak calistirma. Bun slim zaten kullaniciya sahip degil,
+# ama app klasorunu belirli bir kullaniciya ait yapmak iyi pratik.
+RUN groupadd -r appgroup && useradd -r -g appgroup -d /app appuser
 WORKDIR /app
 
-# Build'den standalone çıktıyı kopyala
-COPY --from=builder /app/.next/standalone ./
+# Build'den standalone ciktiyi kopyala
+COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
 
 # Prisma runtime (sadece client, CLI degil)
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=appuser:appgroup /app/prisma ./prisma
+COPY --from=builder --chown=appuser:appgroup /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=appuser:appgroup /app/node_modules/@prisma ./node_modules/@prisma
 
-# Prisma CLI'yi runtime'da calistirmak icin kur
-RUN bun add -g prisma@6.11.1
+# Prisma CLI runtime icin
+RUN bun add -g prisma@6.11.1 && chown -R appuser:appgroup /usr/local/share/.bun
 
 # Startup script
-COPY scripts/start.sh /app/start.sh
+COPY --chown=appuser:appgroup scripts/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
+
+USER appuser
 
 EXPOSE 3000
 

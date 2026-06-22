@@ -10,7 +10,6 @@ export interface Category {
   color: string
   avgPrice: number
   totalProducts: number
-  totalCourses?: number
   totalRevenue: number
   totalStudents?: number
   searchVolume: number
@@ -97,7 +96,6 @@ export interface ProductIdea {
 export interface PlatformOverview {
   totalRevenue: number
   totalProducts: number
-  totalCourses?: number
   totalSearchVolume: number
   avgGrowthRate: number
   totalCategories: number
@@ -156,16 +154,6 @@ export const PLATFORM_CONFIG = {
     salesLabel: 'Satis',
     icon: 'ShoppingCart',
     api: '/api/market',
-  },
-  udemy: {
-    name: 'Udemy',
-    color: '#8b5cf6',
-    gradient: 'from-violet-500 to-purple-500',
-    label: 'Online Kurs',
-    productLabel: 'Kurs',
-    salesLabel: 'Kayit',
-    icon: 'GraduationCap',
-    api: '/api/udemy',
   },
   capafy: {
     name: 'Capafy AI',

@@ -2,26 +2,13 @@ import { NextResponse } from 'next/server'
 import { getPlatformDataFromDB, buildTrendDataFromDB } from '@/data/helpers'
 import { GUMROAD_PRODUCT_IDEAS, GUMROAD_DATA_SOURCES } from '@/data/gumroad/product-ideas'
 import { db } from '@/lib/db'
+import { cachedFetch, setCached } from '@/lib/cache'
 
-const cache = new Map<string, { data: unknown; timestamp: number }>()
-const CACHE_DURATION = 5 * 60 * 1000 // 5 dakika cache (30 dk yerine)
-
-function getCached(key: string) {
-  const entry = cache.get(key)
-  if (entry && Date.now() - entry.timestamp < CACHE_DURATION) return entry.data
-  return null
-}
-function setCache(key: string, data: unknown) {
-  cache.set(key, { data, timestamp: Date.now() })
-}
-
-// Global cache referansini kaydet (cron temizleyebilsin)
-const globalCache = globalThis as unknown as { refreshCache?: Map<string, { data: unknown; timestamp: number }> }
-if (!globalCache.refreshCache) globalCache.refreshCache = cache as any
+const CACHE_DURATION = 5 * 60 * 1000 // 5 dakika cache
 
 export async function GET() {
   try {
-    const cached = getCached('market-data-db')
+    const cached = cachedFetch('market-data-db')
     if (cached) return NextResponse.json(cached)
 
     const {
@@ -123,7 +110,7 @@ export async function GET() {
       lastUpdated: lastRefreshLog?.createdAt?.toISOString() || new Date().toISOString(),
     }
 
-    setCache('market-data-db', result)
+    setCached('market-data-db', result, CACHE_DURATION)
     return NextResponse.json(result)
   } catch (error) {
     console.error('Market API error:', error)

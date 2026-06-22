@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip, Legend } from 'recharts'
-import { Bot, GitCompare, GraduationCap, ShoppingCart, Trophy } from 'lucide-react'
+import { Bot, GitCompare, ShoppingCart, Trophy } from 'lucide-react'
 import { formatNumber, formatCount } from '@/lib/utils'
 import { PlatformIcon } from './PlatformIcon'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,7 +16,7 @@ export function CompareTab({ compareData }: CompareTabProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Platform Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
         {compareData.platforms.map((p: any, i: number) => (
           <Card key={`platform-${i}`} className="border-0 shadow-md shadow-black/5 overflow-hidden">
             <div className="h-1.5" style={{ backgroundColor: p.color }} />
@@ -58,7 +58,7 @@ export function CompareTab({ compareData }: CompareTabProps) {
               <CardTitle className="text-sm sm:text-base font-semibold">Platform Karsilastirma Radari</CardTitle>
               <CardDescription className="text-[10px] sm:text-xs">Buyume, talep, rekabet, fiyat ve komisyon karsilastirmasi</CardDescription>
             </div>
-            <GitCompare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
+            <GitCompare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
           </div>
         </CardHeader>
         <CardContent>
@@ -67,15 +67,13 @@ export function CompareTab({ compareData }: CompareTabProps) {
               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={compareData.comparisonMetrics.map(m => ({
                 metric: m.metric,
                 Gumroad: m.gumroad,
-                Udemy: m.udemy,
                 'Capafy AI': m.capafy,
               }))}>
                 <PolarGrid stroke="#e5e7eb" />
                 <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
                 <PolarRadiusAxis tick={{ fontSize: 9 }} />
-                <Radar name="Gumroad" dataKey="Gumroad" stroke="#f97316" fill="#f97316" fillOpacity={0.1} strokeWidth={2} />
-                <Radar name="Udemy" dataKey="Udemy" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.1} strokeWidth={2} />
-                <Radar name="Capafy AI" dataKey="Capafy AI" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.1} strokeWidth={2} />
+                <Radar name="Gumroad" dataKey="Gumroad" stroke="#f97316" fill="#f97316" fillOpacity={0.2} strokeWidth={2} />
+                <Radar name="Capafy AI" dataKey="Capafy AI" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.2} strokeWidth={2} />
                 <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
               </RadarChart>
@@ -90,7 +88,7 @@ export function CompareTab({ compareData }: CompareTabProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-sm sm:text-base font-semibold">Capraz Pazar Firsatlari</CardTitle>
-              <CardDescription className="text-[10px] sm:text-xs">3 platformda da guclu talep goren konular</CardDescription>
+              <CardDescription className="text-[10px] sm:text-xs">2 platformda da guclu talep goren konular</CardDescription>
             </div>
             <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
           </div>
@@ -102,45 +100,44 @@ export function CompareTab({ compareData }: CompareTabProps) {
                 <div key={`cross-${i}`} className="p-3 sm:p-4 rounded-xl border hover:shadow-md transition-all">
                   <div className="flex items-center justify-between mb-2 sm:mb-3 gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-orange-500 to-violet-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">{i + 1}</div>
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-orange-500 to-cyan-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">{i + 1}</div>
                       <h3 className="font-semibold text-xs sm:text-sm">{opp.theme}</h3>
                     </div>
                     <Badge variant="secondary" className="text-[10px] sm:text-xs bg-emerald-50 text-emerald-700 whitespace-nowrap">{opp.bestPlatform}</Badge>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-3">
                     {/* Gumroad */}
                     <div className="p-2.5 rounded-lg border-l-4" style={{ borderColor: '#f97316' }}>
                       <div className="flex items-center gap-1 mb-1"><ShoppingCart className="w-3 h-3 text-orange-500" /><span className="text-[10px] font-semibold text-orange-600">Gumroad</span></div>
-                      <div className="text-xs font-medium">{opp.gumroad.category}</div>
-                      <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-                        <span>Talep: {opp.gumroad.demand}</span>
-                        <span>Buyume: +{opp.gumroad.growth}%</span>
-                      </div>
-                    </div>
-                    {/* Udemy */}
-                    <div className="p-2.5 rounded-lg border-l-4" style={{ borderColor: '#8b5cf6' }}>
-                      <div className="flex items-center gap-1 mb-1"><GraduationCap className="w-3 h-3 text-violet-500" /><span className="text-[10px] font-semibold text-violet-600">Udemy</span></div>
-                      <div className="text-xs font-medium">{opp.udemy.category}</div>
-                      <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-                        <span>Talep: {opp.udemy.demand}</span>
-                        <span>Buyume: +{opp.udemy.growth}%</span>
-                      </div>
+                      <div className="text-xs font-medium">{opp.gumroad?.category || '-'}</div>
+                      {opp.gumroad && (
+                        <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                          <span>Talep: {opp.gumroad.demand}</span>
+                          <span>Buyume: +{opp.gumroad.growth}%</span>
+                        </div>
+                      )}
                     </div>
                     {/* Capafy */}
                     <div className="p-2.5 rounded-lg border-l-4" style={{ borderColor: '#06b6d4' }}>
-                      <div className="flex items-center gap-1 mb-1"><Bot className="w-3 h-3 text-cyan-500" /><span className="text-[10px] font-semibold text-cyan-600">Capafy AI</span></div>
-                      <div className="text-xs font-medium">{opp.capafy.category}</div>
-                      <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-                        <span>Talep: {opp.capafy.demand}</span>
-                        <span>Buyume: +{opp.capafy.growth}%</span>
-                      </div>
+                      <div className="flex items-center gap-1 mb-1"><Bot className="w-3 h-3 text-cyan-500" /><span className="text-[10px] font-semibold text-cyan-600">Capafy</span></div>
+                      <div className="text-xs font-medium">{opp.capafy?.category || '-'}</div>
+                      {opp.capafy && (
+                        <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                          <span>Talep: {opp.capafy.demand}</span>
+                          <span>Buyume: +{opp.capafy.growth}%</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between text-xs">
                     <p className="text-muted-foreground flex-1">{opp.recommendation}</p>
-                    <Badge variant="outline" className="text-emerald-600 border-emerald-200 ml-2 shrink-0">{opp.potentialRevenue}</Badge>
+                    {opp.priorityScore && (
+                      <Badge variant="outline" className="text-emerald-600 border-emerald-200 ml-2 shrink-0">
+                        Oncelik: {opp.priorityScore.toFixed(1)}/10
+                      </Badge>
+                    )}
                   </div>
                 </div>
               ))}
@@ -150,7 +147,7 @@ export function CompareTab({ compareData }: CompareTabProps) {
       </Card>
 
       {/* Platform Strengths */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
         {compareData.platformStrengths.map((ps: any, i: number) => (
           <Card key={`strength-${i}`} className="border-0 shadow-md shadow-black/5">
             <CardHeader className="pb-1.5 sm:pb-2">
@@ -168,7 +165,16 @@ export function CompareTab({ compareData }: CompareTabProps) {
               </div>
               <div className="pt-3 border-t space-y-2">
                 <div><span className="text-[10px] text-muted-foreground uppercase">En Uygun Icin</span><p className="text-xs font-medium mt-0.5">{ps.bestFor}</p></div>
-                <div><span className="text-[10px] text-muted-foreground uppercase">Gelir Potansiyeli</span><p className="text-xs font-semibold text-emerald-600 mt-0.5">{ps.earningPotential}</p></div>
+                {ps.dataStatus && (
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase">Veri Durumu</span>
+                    <p className="text-xs font-semibold mt-0.5">
+                      <span className={ps.dataStatus === 'real-data' ? 'text-emerald-600' : 'text-amber-600'}>
+                        {ps.dataStatus === 'real-data' ? `Canli veri (${ps.observedCategories} kategori)` : 'Henuz veri yok'}
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
