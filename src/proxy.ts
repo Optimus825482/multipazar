@@ -42,7 +42,8 @@ function getRateLimiter(limit: number, windowMs: number) {
 }
 
 const apiLimiter = getRateLimiter(100, 60 * 1000) // 100 istek/dakika
-const refreshLimiter = getRateLimiter(5, 60 * 1000) // 5 istek/dakika refresh endpoint
+const refreshLimit = 20
+const refreshLimiter = getRateLimiter(refreshLimit, 60 * 1000) // refresh endpoint
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -62,7 +63,7 @@ export function proxy(request: NextRequest) {
     const response = NextResponse.next()
 
     // Rate limit headers
-    response.headers.set('X-RateLimit-Limit', String(isRefresh ? 5 : 100))
+    response.headers.set('X-RateLimit-Limit', String(isRefresh ? refreshLimit : 100))
     response.headers.set('X-RateLimit-Remaining', String(result.remaining))
 
     if (!result.allowed) {
