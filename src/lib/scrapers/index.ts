@@ -275,8 +275,7 @@ async function refreshPlatformData(platform: Platform): Promise<void> {
 
   // Hic gecerli kategori yoksa veritabanini bos birakma - eski veriyi koru
   if (validCategories.length === 0) {
-    console.warn(`[${platform}] Hic gecerli veri yok, refresh iptal edildi (eski veri korundu)`)
-    return
+    throw new Error(`${platform}: hic gecerli gercek veri alinamadi; refresh iptal edildi (eski veri korundu)`)
   }
 
   // 3. Atomik transaction: sil + yeniden yaz. Hata olursa eski veri korunsun.

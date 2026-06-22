@@ -26,6 +26,15 @@ export interface GumroadCategoryData {
 
 const GUMROAD_DISCOVER = 'https://gumroad.com/discover'
 
+function decodeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+}
+
 /**
  * Gumroad Inertia.js JSON API'inden urun verilerini ceker
  * Once HTML sayfasindan Inertia versiyonunu alir, sonra JSON istegi yapar
@@ -46,7 +55,7 @@ async function getInertiaVersion(): Promise<string | null> {
     const pageMatch = html.match(/data-page="([^"]+)"/)
     if (pageMatch?.[1]) {
       try {
-        const pageData = JSON.parse(decodeURIComponent(pageMatch[1]))
+        const pageData = JSON.parse(decodeHtmlAttribute(pageMatch[1]))
         return pageData.version || null
       } catch {}
     }
@@ -95,7 +104,7 @@ async function searchGumroad(query: string, page: number = 1): Promise<{
       const pageMatch = text.match(/data-page="([^"]+)"/)
       if (pageMatch?.[1]) {
         try {
-          data = JSON.parse(decodeURIComponent(pageMatch[1]))
+          data = JSON.parse(decodeHtmlAttribute(pageMatch[1]))
         } catch {}
       }
     }
@@ -130,7 +139,7 @@ async function searchGumroad(query: string, page: number = 1): Promise<{
       const permalink = item.permalink || ''
       const nativeType = item.native_type || 'digital'
       const thumbnailUrl = item.thumbnail_url || ''
-      const tags = item.tags?.join(',') || query
+      const tags = Array.isArray(item.tags) ? item.tags.join(',') : query
 
       if (name && price > 0) {
         products.push({
@@ -140,7 +149,7 @@ async function searchGumroad(query: string, page: number = 1): Promise<{
           reviewCount,
           salesCount: 0, // Gumroad sales count hidden for most products
           seller,
-          url: `https://gumroad.com/l/${permalink}`,
+          url: item.url || `https://gumroad.com/l/${permalink}`,
           isVerified,
           tags,
           thumbnailUrl,
